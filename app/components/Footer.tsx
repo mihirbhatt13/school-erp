@@ -174,8 +174,8 @@ export default function Footer() {
               </li>
               <li className="flex items-center gap-2.5">
                 <span className="text-indigo-400 flex-shrink-0">✉️</span>
-                <a href="mailto:info@edupulse.edu" className="hover:text-indigo-400 transition-colors">
-                  info@edupulse.edu
+                <a href="mailto:mihirbhatt529@gmail.com" className="hover:text-indigo-400 transition-colors">
+                  mihirbhatt529@gmail.com
                 </a>
               </li>
               <li className="pt-1 text-[11px] text-slate-400">

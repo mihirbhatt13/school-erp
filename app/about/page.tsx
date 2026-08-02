@@ -14,7 +14,7 @@ export default function AboutPage() {
         </div>
         <div className="hidden sm:flex items-center gap-4 text-slate-300">
           <a href="tel:+919079781144" className="hover:text-amber-400 transition">📞 +91 90797 81144</a>
-          <span>✉️ info@edupulse.edu</span>
+          <span>✉️ mihirbhatt529@gmail.com</span>
         </div>
       </div>
 

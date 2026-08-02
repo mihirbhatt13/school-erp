@@ -144,7 +144,7 @@ export default function Sidebar() {
             </div>
             <div className="overflow-hidden">
               <p className="text-xs font-bold text-slate-900 truncate">Administrator</p>
-              <p className="text-[11px] text-slate-500 truncate">admin@school.com</p>
+              <p className="text-[11px] text-slate-500 truncate">mihirbhatt529@gmail.com</p>
             </div>
           </div>
 

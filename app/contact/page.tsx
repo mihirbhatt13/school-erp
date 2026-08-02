@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 import Footer from "@/app/components/Footer";
+import { showToast } from "@/app/components/Toast";
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -15,10 +16,12 @@ export default function ContactPage() {
   });
 
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.email || !formData.message) return;
+    setLoading(true);
 
     try {
       const response = await fetch("/api/contact", {
@@ -29,9 +32,15 @@ export default function ContactPage() {
 
       if (response.ok) {
         setSubmitted(true);
+        showToast("Inquiry submitted successfully! Our office will contact you soon.", "success");
+      } else {
+        showToast("Failed to submit inquiry. Please try again.", "error");
       }
     } catch (error) {
       console.error(error);
+      showToast("Error submitting inquiry form.", "error");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -44,7 +53,7 @@ export default function ContactPage() {
         </div>
         <div className="hidden sm:flex items-center gap-4 text-slate-300">
           <a href="tel:+919079781144" className="hover:text-amber-400 transition">📞 +91 90797 81144</a>
-          <span>✉️ info@edupulse.edu</span>
+          <span>✉️ mihirbhatt529@gmail.com</span>
         </div>
       </div>
 
@@ -130,7 +139,9 @@ export default function ContactPage() {
                   <span className="text-2xl">✉️</span>
                   <div>
                     <strong className="text-slate-900 block">Email Address</strong>
-                    <p className="text-indigo-700 font-bold text-xs mt-0.5">info@edupulse.edu</p>
+                    <a href="mailto:mihirbhatt529@gmail.com" className="text-indigo-700 font-bold text-xs mt-0.5 block hover:underline">
+                      mihirbhatt529@gmail.com
+                    </a>
                   </div>
                 </div>
 
@@ -160,8 +171,8 @@ export default function ContactPage() {
                   ✓
                 </div>
                 <h3 className="text-2xl font-bold font-heading text-slate-900">Message Sent!</h3>
-                <p className="text-slate-600 text-xs max-w-md mx-auto">
-                  Thank you for reaching out to EduPulse Academy. Our office will respond within 24 hours.
+                <p className="text-slate-600 text-xs max-w-md mx-auto font-medium">
+                  Thank you for reaching out to EduPulse Academy. Our office will respond to <strong className="text-slate-900">{formData.email}</strong> within 24 hours.
                 </p>
                 <button
                   onClick={() => setSubmitted(false)}
@@ -249,9 +260,10 @@ export default function ContactPage() {
 
                 <button
                   type="submit"
-                  className="w-full py-3.5 rounded-xl bg-indigo-700 hover:bg-indigo-600 text-white font-extrabold text-xs shadow-lg shadow-indigo-700/25 transition"
+                  disabled={loading}
+                  className="w-full py-3.5 rounded-xl bg-indigo-700 hover:bg-indigo-600 text-white font-extrabold text-xs shadow-lg shadow-indigo-700/25 transition disabled:opacity-50"
                 >
-                  Send Message →
+                  {loading ? "Sending Message..." : "Send Message →"}
                 </button>
               </form>
             )}

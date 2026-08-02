@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { showToast } from "@/app/components/Toast";
+import ConfirmModal from "@/app/components/ConfirmModal";
+import { TableSkeletonRows } from "@/app/components/SkeletonLoader";
 
 interface ContactInquiry {
   id: number;
@@ -16,6 +19,7 @@ export default function AdminInquiriesPage() {
   const [inquiries, setInquiries] = useState<ContactInquiry[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
 
   const fetchInquiries = async () => {
     try {
@@ -26,6 +30,7 @@ export default function AdminInquiriesPage() {
       }
     } catch (error) {
       console.error(error);
+      showToast("Error loading inquiries.", "error");
     } finally {
       setLoading(false);
     }
@@ -35,30 +40,34 @@ export default function AdminInquiriesPage() {
     fetchInquiries();
   }, []);
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this inquiry?")) return;
+  const confirmDelete = async () => {
+    if (!deleteTargetId) return;
 
     try {
-      const res = await fetch(`/api/contact/${id}`, {
+      const res = await fetch(`/api/contact/${deleteTargetId}`, {
         method: "DELETE",
       });
 
       if (res.ok) {
-        setInquiries(inquiries.filter((item) => item.id !== id));
+        setInquiries((prev) => prev.filter((item) => item.id !== deleteTargetId));
+        showToast("Contact inquiry removed.", "warning");
       } else {
-        alert("Failed to delete inquiry.");
+        showToast("Failed to delete inquiry.", "error");
       }
     } catch (error) {
       console.error(error);
+      showToast("Error deleting inquiry.", "error");
+    } finally {
+      setDeleteTargetId(null);
     }
   };
 
   const filteredInquiries = inquiries.filter(
     (item) =>
-      item.name.toLowerCase().includes(search.toLowerCase()) ||
-      item.email.toLowerCase().includes(search.toLowerCase()) ||
-      item.category.toLowerCase().includes(search.toLowerCase()) ||
-      item.message.toLowerCase().includes(search.toLowerCase())
+      (item.name || "").toLowerCase().includes(search.toLowerCase()) ||
+      (item.email || "").toLowerCase().includes(search.toLowerCase()) ||
+      (item.category || "").toLowerCase().includes(search.toLowerCase()) ||
+      (item.message || "").toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -72,7 +81,7 @@ export default function AdminInquiriesPage() {
           <h2 className="text-2xl font-bold font-heading text-slate-900 mt-1">
             Contact Us Inquiries
           </h2>
-          <p className="text-slate-500 text-xs mt-0.5">
+          <p className="text-slate-500 text-xs mt-0.5 font-medium">
             Review and manage inquiry submissions from parents, students, and prospective faculty.
           </p>
         </div>
@@ -98,35 +107,37 @@ export default function AdminInquiriesPage() {
 
       {/* Data Table */}
       <div className="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-lg">
-        {loading ? (
-          <div className="p-12 text-center text-slate-500 text-sm">
-            Loading inquiries...
-          </div>
-        ) : filteredInquiries.length === 0 ? (
-          <div className="p-12 text-center text-slate-500 text-sm">
-            No contact inquiries found.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-700">
-              <thead className="bg-slate-50 text-slate-700 text-xs uppercase font-bold border-b border-slate-200">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm text-slate-700">
+            <thead className="bg-slate-50 text-slate-700 text-xs uppercase font-bold border-b border-slate-200">
+              <tr>
+                <th className="p-4">Date</th>
+                <th className="p-4">Sender</th>
+                <th className="p-4">Category</th>
+                <th className="p-4">Message</th>
+                <th className="p-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
+                <TableSkeletonRows rows={5} cols={5} />
+              ) : filteredInquiries.length === 0 ? (
                 <tr>
-                  <th className="p-4">Date</th>
-                  <th className="p-4">Sender</th>
-                  <th className="p-4">Category</th>
-                  <th className="p-4">Message</th>
-                  <th className="p-4 text-right">Actions</th>
+                  <td colSpan={5} className="p-12 text-center text-slate-500 text-xs font-medium">
+                    No contact inquiries found.
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredInquiries.map((item) => {
-                  const dateFormatted = new Date(item.createdAt).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  });
+              ) : (
+                filteredInquiries.map((item) => {
+                  const dateFormatted = item.createdAt
+                    ? new Date(item.createdAt).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "Recently";
 
                   return (
                     <tr key={item.id} className="hover:bg-slate-50 transition">
@@ -144,13 +155,13 @@ export default function AdminInquiriesPage() {
                         </span>
                       </td>
                       <td className="p-4 max-w-md">
-                        <p className="text-xs text-slate-700 line-clamp-3 leading-relaxed">
+                        <p className="text-xs text-slate-700 line-clamp-3 leading-relaxed font-medium">
                           {item.message}
                         </p>
                       </td>
                       <td className="p-4 text-right whitespace-nowrap">
                         <button
-                          onClick={() => handleDelete(item.id)}
+                          onClick={() => setDeleteTargetId(item.id)}
                           className="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-200 text-xs font-bold transition"
                         >
                           Delete 🗑️
@@ -158,12 +169,21 @@ export default function AdminInquiriesPage() {
                       </td>
                     </tr>
                   );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
+
+      <ConfirmModal
+        isOpen={Boolean(deleteTargetId)}
+        title="Delete Contact Inquiry"
+        message="Are you sure you want to remove this inquiry submission? This action cannot be undone."
+        confirmText="Yes, Delete Inquiry"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTargetId(null)}
+      />
     </div>
   );
 }
