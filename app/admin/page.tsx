@@ -20,7 +20,6 @@ export default function AdminPage() {
   const [feeCount, setFeeCount] = useState(0);
   const [examCount, setExamCount] = useState(0);
   const [noticeCount, setNoticeCount] = useState(0);
-  const [markCount, setMarkCount] = useState(0);
   const [inquiryCount, setInquiryCount] = useState(0);
   const [recentInquiries, setRecentInquiries] = useState<Inquiry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,7 +27,7 @@ export default function AdminPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [students, teachers, classes, attendance, fees, exams, notices, marks, inquiries] =
+        const [students, teachers, classes, attendance, fees, exams, notices, inquiries] =
           await Promise.all([
             fetch("/api/students").then((r) => r.json()).catch(() => []),
             fetch("/api/teachers").then((r) => r.json()).catch(() => []),
@@ -37,7 +36,6 @@ export default function AdminPage() {
             fetch("/api/fees").then((r) => r.json()).catch(() => []),
             fetch("/api/exams").then((r) => r.json()).catch(() => []),
             fetch("/api/notices").then((r) => r.json()).catch(() => []),
-            fetch("/api/marks").then((r) => r.json()).catch(() => []),
             fetch("/api/contact").then((r) => r.json()).catch(() => []),
           ]);
 
@@ -47,7 +45,7 @@ export default function AdminPage() {
 
         if (Array.isArray(attendance) && attendance.length > 0) {
           const present = attendance.filter(
-            (item: { status: string }) => item.status === "Present"
+            (item: { status: string }) => item.status?.toLowerCase() === "present"
           ).length;
           setAttendancePercentage(Math.round((present / attendance.length) * 100));
         } else {
@@ -57,7 +55,6 @@ export default function AdminPage() {
         setFeeCount(Array.isArray(fees) ? fees.length : 0);
         setExamCount(Array.isArray(exams) ? exams.length : 0);
         setNoticeCount(Array.isArray(notices) ? notices.length : 0);
-        setMarkCount(Array.isArray(marks) ? marks.length : 0);
         setInquiryCount(Array.isArray(inquiries) ? inquiries.length : 0);
         setRecentInquiries(Array.isArray(inquiries) ? inquiries.slice(0, 5) : []);
       } catch (err) {
@@ -71,14 +68,14 @@ export default function AdminPage() {
   }, []);
 
   const stats = [
-    { name: "Total Students", value: studentCount, icon: "👨‍🎓", href: "/student", color: "bg-blue-50 border-blue-200 text-blue-700" },
-    { name: "Faculty Members", value: teacherCount, icon: "👨‍🏫", href: "/teacher", color: "bg-purple-50 border-purple-200 text-purple-700" },
-    { name: "Active Classes", value: classCount, icon: "🏫", href: "/classes", color: "bg-amber-50 border-amber-200 text-amber-700" },
-    { name: "Avg Attendance Rate", value: `${attendancePercentage}%`, icon: "✅", href: "/attendance", color: "bg-emerald-50 border-emerald-200 text-emerald-700" },
+    { name: "Total Students", value: studentCount, icon: "👨‍🎓", href: "/admin/students", color: "bg-blue-50 border-blue-200 text-blue-700" },
+    { name: "Faculty Members", value: teacherCount, icon: "👨‍🏫", href: "/admin/teachers", color: "bg-purple-50 border-purple-200 text-purple-700" },
+    { name: "Active Classes", value: classCount, icon: "🏫", href: "/admin/classes", color: "bg-amber-50 border-amber-200 text-amber-700" },
+    { name: "Avg Attendance Rate", value: `${attendancePercentage}%`, icon: "✅", href: "/admin/attendance", color: "bg-emerald-50 border-emerald-200 text-emerald-700" },
     { name: "Contact Inquiries", value: inquiryCount, icon: "📬", href: "/admin/inquiries", color: "bg-indigo-50 border-indigo-200 text-indigo-700" },
-    { name: "Fee Records", value: feeCount, icon: "💰", href: "/fees", color: "bg-emerald-50 border-emerald-200 text-emerald-700" },
-    { name: "Upcoming Exams", value: examCount, icon: "📝", href: "/exams", color: "bg-cyan-50 border-cyan-200 text-cyan-700" },
-    { name: "Active Notices", value: noticeCount, icon: "📢", href: "/notices", color: "bg-rose-50 border-rose-200 text-rose-700" },
+    { name: "Fee Records", value: feeCount, icon: "💰", href: "/admin/fees", color: "bg-emerald-50 border-emerald-200 text-emerald-700" },
+    { name: "Upcoming Exams", value: examCount, icon: "📝", href: "/admin/exams", color: "bg-cyan-50 border-cyan-200 text-cyan-700" },
+    { name: "Active Notices", value: noticeCount, icon: "📢", href: "/admin/notices", color: "bg-rose-50 border-rose-200 text-rose-700" },
   ];
 
   return (
@@ -192,7 +189,7 @@ export default function AdminPage() {
           </Link>
 
           <Link
-            href="/student"
+            href="/admin/students"
             className="p-4 rounded-xl bg-slate-50 border border-slate-200 hover:border-indigo-500 text-center group transition"
           >
             <span className="text-2xl block mb-2 group-hover:scale-110 transition-transform">👨‍🎓</span>
@@ -200,7 +197,7 @@ export default function AdminPage() {
           </Link>
 
           <Link
-            href="/teacher"
+            href="/admin/teachers"
             className="p-4 rounded-xl bg-slate-50 border border-slate-200 hover:border-purple-500 text-center group transition"
           >
             <span className="text-2xl block mb-2 group-hover:scale-110 transition-transform">👨‍🏫</span>
@@ -208,7 +205,7 @@ export default function AdminPage() {
           </Link>
 
           <Link
-            href="/fees"
+            href="/admin/fees"
             className="p-4 rounded-xl bg-slate-50 border border-slate-200 hover:border-emerald-500 text-center group transition"
           >
             <span className="text-2xl block mb-2 group-hover:scale-110 transition-transform">💳</span>

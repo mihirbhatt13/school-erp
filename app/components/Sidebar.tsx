@@ -19,15 +19,15 @@ export default function Sidebar() {
   }
 
   const menuItems = [
-    { name: "Dashboard", href: "/admin", icon: "📊" },
-    { name: "Student Management", href: "/student", icon: "👨‍🎓" },
-    { name: "Teacher Directory", href: "/teacher", icon: "👨‍🏫" },
-    { name: "Class Allocation", href: "/classes", icon: "🏫" },
-    { name: "Attendance Desk", href: "/attendance", icon: "📅" },
-    { name: "Fees & Accounts", href: "/fees", icon: "💰" },
-    { name: "Exams & Timetable", href: "/exams", icon: "📝" },
-    { name: "Marks & Grades", href: "/marks", icon: "🎓" },
-    { name: "Notice Board", href: "/notices", icon: "📢" },
+    { name: "Dashboard Overview", href: "/admin", icon: "📊" },
+    { name: "Student Management", href: "/admin/students", icon: "👨‍🎓" },
+    { name: "Teacher Directory", href: "/admin/teachers", icon: "👨‍🏫" },
+    { name: "Class Allocation", href: "/admin/classes", icon: "🏫" },
+    { name: "Attendance Desk", href: "/admin/attendance", icon: "📅" },
+    { name: "Fees & Accounts", href: "/admin/fees", icon: "💰" },
+    { name: "Exams & Timetable", href: "/admin/exams", icon: "📝" },
+    { name: "Marks & Grades", href: "/admin/marks", icon: "🎓" },
+    { name: "Notice Board", href: "/admin/notices", icon: "📢" },
     { name: "Contact Inquiries", href: "/admin/inquiries", icon: "📬" },
   ];
 
@@ -109,7 +109,10 @@ export default function Sidebar() {
           </p>
           <ul className="space-y-1">
             {menuItems.map((item) => {
-              const isActive = pathname === item.href;
+              const isActive =
+                item.href === "/admin"
+                  ? pathname === "/admin"
+                  : pathname === item.href || pathname.startsWith(item.href + "/");
               return (
                 <li key={item.name}>
                   <Link

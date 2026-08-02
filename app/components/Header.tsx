@@ -8,18 +8,25 @@ export default function Header() {
 
   const pageTitles: Record<string, string> = {
     "/admin": "Dashboard Overview",
-    "/student": "Student Management",
-    "/teacher": "Faculty Directory",
-    "/classes": "Classes & Sections",
-    "/attendance": "Attendance Register",
-    "/fees": "Fee Management & Ledger",
-    "/exams": "Examination Schedules",
-    "/marks": "Student Marks Entry",
-    "/notices": "Notice Board Broadcasts",
+    "/admin/students": "Student Management",
+    "/admin/teachers": "Faculty Directory",
+    "/admin/classes": "Classes & Sections Allocation",
+    "/admin/attendance": "Attendance Desk & Register",
+    "/admin/fees": "Fee Management & Ledger",
+    "/admin/exams": "Examination Schedules & Timetable",
+    "/admin/marks": "Student Marks & Grades Entry",
+    "/admin/notices": "Notice Board Broadcasts",
     "/admin/inquiries": "Contact Us Inquiries",
   };
 
   const pageTitle = pageTitles[pathname] || "EduPulse Academy ERP";
+
+  const moduleName = pathname
+    .replace("/admin", "")
+    .replace("/", "")
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "short",
@@ -38,12 +45,12 @@ export default function Header() {
               className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white border border-indigo-200 font-bold transition flex items-center gap-1"
             >
               <span>←</span>
-              <span>Back to Dashboard</span>
+              <span>Dashboard</span>
             </Link>
           )}
           <span>EduPulse Academy</span>
           <span>/</span>
-          <span className="capitalize text-slate-700">{pathname.replace("/", "").replace("admin/", "") || "Dashboard"}</span>
+          <span className="text-slate-700">{moduleName || "Dashboard"}</span>
         </div>
         <h1 className="text-2xl font-extrabold font-heading text-slate-900">
           {pageTitle}
