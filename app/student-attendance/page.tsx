@@ -25,7 +25,7 @@ export default function StudentAttendance() {
       const response = await fetch("/api/student-attendance");
       if (!response.ok) return;
       const data = await response.json();
-      setAttendance(data);
+      setAttendance(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error(error);
     } finally {
@@ -33,64 +33,81 @@ export default function StudentAttendance() {
     }
   }
 
+  const presentCount = attendance.filter((a) => a.status?.toLowerCase() === "present").length;
+  const attendanceRate = attendance.length > 0 ? Math.round((presentCount / attendance.length) * 100) : 0;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-700 font-bold text-sm">
+        Loading Attendance History...
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-mesh-dark text-slate-100 p-6 md:p-10">
+    <div className="min-h-screen bg-slate-50 text-slate-800 p-6 md:p-10">
       <div className="max-w-4xl mx-auto space-y-6">
-        {/* Navigation Bar with Back Button */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-card rounded-3xl p-6 border border-blue-500/30">
+        {/* Navigation Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white rounded-3xl p-6 border border-slate-200 shadow-xl">
           <div className="flex items-center gap-3">
             <Link
               href="/student-dashboard"
-              className="px-3 py-1.5 rounded-xl bg-blue-500/20 hover:bg-blue-500 text-blue-300 hover:text-white border border-blue-500/30 font-bold text-xs transition"
+              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition"
             >
-              ← Back to Student Dashboard
+              ← Back
             </Link>
-            <h1 className="text-2xl font-bold font-heading text-white">
-              My Attendance History
-            </h1>
+            <div>
+              <h1 className="text-2xl font-extrabold font-heading text-slate-900">
+                Attendance Register
+              </h1>
+              <p className="text-slate-500 text-xs mt-0.5 font-medium">
+                Personal daily presence logs and attendance score
+              </p>
+            </div>
           </div>
 
-          <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold uppercase tracking-wider">
-            Total Logs: {attendance.length}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="px-3.5 py-1.5 rounded-full bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-100">
+              Score: {attendanceRate}%
+            </span>
+            <span className="px-3.5 py-1.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100">
+              Total Logs: {attendance.length}
+            </span>
+          </div>
         </div>
 
-        {/* Data Table Card */}
-        <div className="glass-card rounded-3xl overflow-hidden border border-slate-800">
+        {/* Data Table */}
+        <div className="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-xl">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-300">
-              <thead className="bg-slate-900/90 text-slate-400 text-xs uppercase font-bold border-b border-slate-800">
+            <table className="w-full text-left text-sm text-slate-700">
+              <thead className="bg-slate-100 text-slate-600 text-xs uppercase font-bold border-b border-slate-200">
                 <tr>
                   <th className="p-4">Date</th>
                   <th className="p-4">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/80">
-                {loading ? (
+              <tbody className="divide-y divide-slate-100">
+                {attendance.length === 0 ? (
                   <tr>
-                    <td colSpan={2} className="p-6 text-center text-slate-400 text-sm">
-                      Loading attendance logs...
-                    </td>
-                  </tr>
-                ) : attendance.length === 0 ? (
-                  <tr>
-                    <td colSpan={2} className="p-6 text-center text-slate-400 text-sm">
-                      No attendance logs recorded.
+                    <td colSpan={2} className="p-8 text-center text-slate-500 text-xs font-medium">
+                      No attendance logs recorded yet.
                     </td>
                   </tr>
                 ) : (
                   attendance.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-900/40 transition">
-                      <td className="p-4 text-xs font-bold text-white">{item.date}</td>
+                    <tr key={item.id} className="hover:bg-slate-50 transition">
+                      <td className="p-4 text-xs font-bold text-slate-900">{item.date}</td>
                       <td className="p-4">
                         <span
                           className={`px-3 py-1 rounded-full text-xs font-bold ${
-                            item.status.toLowerCase() === "present"
-                              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                              : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                            item.status?.toLowerCase() === "present"
+                              ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                              : item.status?.toLowerCase() === "late"
+                              ? "bg-amber-100 text-amber-800 border border-amber-200"
+                              : "bg-rose-100 text-rose-800 border border-rose-200"
                           }`}
                         >
-                          {item.status.toLowerCase() === "present" ? "✅ Present" : "❌ Absent"}
+                          {item.status}
                         </span>
                       </td>
                     </tr>
