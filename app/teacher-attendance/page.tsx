@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { showToast } from "@/app/components/Toast";
+import { exportToCSV } from "@/lib/csvExport";
 
 interface Student {
   id: number;
@@ -37,7 +39,6 @@ export default function TeacherAttendancePage() {
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [attendanceStates, setAttendanceStates] = useState<Record<number, "Present" | "Absent" | "Late">>({});
   const [submitting, setSubmitting] = useState(false);
-  const [markMessage, setMarkMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
   
   // History Search State
   const [search, setSearch] = useState("");
@@ -64,7 +65,13 @@ export default function TeacherAttendancePage() {
       const allStudents: Student[] = await studentsRes.json();
       const allLogs: AttendanceRecord[] = await attendanceRes.json();
 
-      const studentList = Array.isArray(allStudents) ? allStudents : [];
+      let studentList = Array.isArray(allStudents) ? allStudents : [];
+      if (tData?.assignedClass) {
+        const classStudents = studentList.filter(
+          (s) => s.class.toLowerCase() === tData?.assignedClass.toLowerCase()
+        );
+        if (classStudents.length > 0) studentList = classStudents;
+      }
       setStudents(studentList);
 
       // Initialize attendance states default to "Present"
@@ -79,6 +86,7 @@ export default function TeacherAttendancePage() {
       setFilteredLogs(logsList);
     } catch (error) {
       console.error(error);
+      showToast("Error loading attendance register data.", "error");
     } finally {
       setLoading(false);
     }
@@ -88,12 +96,20 @@ export default function TeacherAttendancePage() {
     setAttendanceStates((prev) => ({ ...prev, [studentId]: status }));
   }
 
+  function handleMarkAllPresent() {
+    const updated: Record<number, "Present" | "Absent" | "Late"> = {};
+    students.forEach((s) => {
+      updated[s.id] = "Present";
+    });
+    setAttendanceStates(updated);
+    showToast("All students set to Present.", "info");
+  }
+
   async function handleMarkAttendance(e: React.FormEvent) {
     e.preventDefault();
     if (students.length === 0) return;
 
     setSubmitting(true);
-    setMarkMessage(null);
 
     try {
       let successCount = 0;
@@ -116,18 +132,18 @@ export default function TeacherAttendancePage() {
       }
 
       if (successCount > 0) {
-        setMarkMessage({ text: `Attendance saved for ${successCount} students on ${selectedDate}.`, type: "success" });
+        showToast(`Attendance saved for ${successCount} students on ${selectedDate}.`, "success");
         // Reload logs
         const refreshedLogs = await (await fetch("/api/attendance")).json();
         const list = Array.isArray(refreshedLogs) ? refreshedLogs : [];
         setAttendanceLogs(list);
         setFilteredLogs(list);
       } else {
-        setMarkMessage({ text: "Failed to submit attendance.", type: "error" });
+        showToast("Failed to submit attendance.", "error");
       }
     } catch (error) {
       console.error(error);
-      setMarkMessage({ text: "Error saving attendance register.", type: "error" });
+      showToast("Error saving attendance register.", "error");
     } finally {
       setSubmitting(false);
     }
@@ -151,10 +167,21 @@ export default function TeacherAttendancePage() {
     setFilteredLogs(matched);
   }
 
+  function handleExportCSV() {
+    exportToCSV("attendance_logs", filteredLogs, [
+      { key: "id", label: "Log ID" },
+      { key: "date", label: "Date" },
+      { key: "student", label: "Student Name" },
+      { key: "className", label: "Class" },
+      { key: "status", label: "Status" },
+    ]);
+    showToast("Attendance logs exported to CSV file.", "info");
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-700 font-bold text-sm">
-        Loading Attendance Module...
+        Loading Attendance Register...
       </div>
     );
   }
@@ -217,27 +244,25 @@ export default function TeacherAttendancePage() {
               </div>
 
               <div className="flex items-center gap-3">
-                <label className="text-xs font-bold text-slate-700">Date:</label>
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="bg-slate-50 border border-slate-300 text-slate-900 font-bold rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
-                />
+                <button
+                  type="button"
+                  onClick={handleMarkAllPresent}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-xs hover:bg-emerald-600 hover:text-white transition"
+                >
+                  ✓ Mark All Present
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-bold text-slate-700">Date:</label>
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="bg-slate-50 border border-slate-300 text-slate-900 font-bold rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
+                  />
+                </div>
               </div>
             </div>
-
-            {markMessage && (
-              <div
-                className={`p-3 rounded-xl border text-xs font-bold text-center ${
-                  markMessage.type === "success"
-                    ? "bg-emerald-100 border-emerald-200 text-emerald-800"
-                    : "bg-rose-100 border-rose-200 text-rose-800"
-                }`}
-              >
-                {markMessage.text}
-              </div>
-            )}
 
             <form onSubmit={handleMarkAttendance} className="space-y-6">
               <div className="overflow-x-auto">
@@ -331,16 +356,26 @@ export default function TeacherAttendancePage() {
         {/* TAB 2: ATTENDANCE HISTORY LOGS */}
         {activeTab === "history" && (
           <div className="space-y-6">
-            {/* Search Bar - Crisp visible dark text while writing! */}
-            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-md flex items-center gap-3">
-              <span className="text-slate-400 font-bold">🔍</span>
-              <input
-                type="text"
-                placeholder="Search attendance logs by student name, date, or status..."
-                value={search}
-                onChange={(e) => handleSearch(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 rounded-xl px-4 py-2.5 text-sm font-medium focus:bg-white focus:border-indigo-600 outline-none transition"
-              />
+            {/* Search & Export Bar */}
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-md flex items-center justify-between gap-3">
+              <div className="relative flex-1">
+                <span className="absolute left-3.5 top-2.5 text-slate-400">🔍</span>
+                <input
+                  type="text"
+                  placeholder="Search attendance logs by student name, date, or status..."
+                  value={search}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 rounded-xl pl-10 pr-4 py-2 text-sm font-medium focus:bg-white focus:border-indigo-600 outline-none transition"
+                />
+              </div>
+
+              <button
+                onClick={handleExportCSV}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition"
+              >
+                <span>📥</span>
+                <span>Export CSV</span>
+              </button>
             </div>
 
             <div className="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-xl">

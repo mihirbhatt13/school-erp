@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Outfit } from "next/font/google";
 import "./globals.css";
+import ToastContainer from "./components/Toast";
 
 const plusJakarta = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
@@ -32,6 +33,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-slate-900 text-slate-100 selection:bg-indigo-500 selection:text-white">
         {children}
+        <ToastContainer />
       </body>
     </html>
   );

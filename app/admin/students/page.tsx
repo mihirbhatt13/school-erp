@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { exportToCSV } from "@/lib/csvExport";
+import { showToast } from "@/app/components/Toast";
+import ConfirmModal from "@/app/components/ConfirmModal";
+import { TableSkeletonRows } from "@/app/components/SkeletonLoader";
 
 interface Student {
   id: number;
@@ -33,6 +37,9 @@ export default function AdminStudentsPage() {
   const [password, setPassword] = useState("student123");
   const [submitting, setSubmitting] = useState(false);
 
+  // Delete Confirm State
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+
   useEffect(() => {
     fetchStudents();
   }, []);
@@ -46,6 +53,7 @@ export default function AdminStudentsPage() {
       setFilteredStudents(list);
     } catch (err) {
       console.error("Failed to fetch students:", err);
+      showToast("Failed to load student directory.", "error");
     } finally {
       setLoading(false);
     }
@@ -72,6 +80,19 @@ export default function AdminStudentsPage() {
     }
 
     setFilteredStudents(list);
+  }
+
+  function handleExportCSV() {
+    exportToCSV("students_roster", filteredStudents, [
+      { key: "id", label: "Student ID" },
+      { key: "rollNo", label: "Roll Number" },
+      { key: "name", label: "Full Name" },
+      { key: "class", label: "Class Assigned" },
+      { key: "email", label: "Email Address" },
+      { key: "phone", label: "Phone Number" },
+      { key: "address", label: "Residential Address" },
+    ]);
+    showToast("Student roster exported to CSV file.", "info");
   }
 
   function openAddModal() {
@@ -131,22 +152,37 @@ export default function AdminStudentsPage() {
 
       if (res.ok) {
         setShowModal(false);
+        showToast(
+          editingId ? `Updated student profile for ${name}` : `Registered student ${name}`,
+          "success"
+        );
         fetchStudents();
+      } else {
+        showToast("Failed to save student record.", "error");
       }
     } catch (err) {
       console.error(err);
+      showToast("Error saving student record.", "error");
     } finally {
       setSubmitting(false);
     }
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm("Are you sure you want to remove this student?")) return;
+  async function confirmDelete() {
+    if (!deleteTargetId) return;
     try {
-      const res = await fetch(`/api/students/${id}`, { method: "DELETE" });
-      if (res.ok) fetchStudents();
+      const res = await fetch(`/api/students/${deleteTargetId}`, { method: "DELETE" });
+      if (res.ok) {
+        showToast("Student profile deleted.", "warning");
+        fetchStudents();
+      } else {
+        showToast("Failed to delete student.", "error");
+      }
     } catch (err) {
       console.error(err);
+      showToast("Error removing student.", "error");
+    } finally {
+      setDeleteTargetId(null);
     }
   }
 
@@ -184,13 +220,22 @@ export default function AdminStudentsPage() {
           </select>
         </div>
 
-        <button
-          onClick={openAddModal}
-          className="px-5 py-2.5 rounded-xl bg-indigo-700 hover:bg-indigo-600 text-white font-bold text-xs shadow-md flex items-center justify-center gap-2 transition"
-        >
-          <span>➕</span>
-          <span>Add New Student</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCSV}
+            className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition"
+          >
+            <span>📥</span>
+            <span>Export CSV</span>
+          </button>
+          <button
+            onClick={openAddModal}
+            className="px-5 py-2.5 rounded-xl bg-indigo-700 hover:bg-indigo-600 text-white font-bold text-xs shadow-md flex items-center justify-center gap-2 transition"
+          >
+            <span>➕</span>
+            <span>Add Student</span>
+          </button>
+        </div>
       </div>
 
       {/* Student Roster Table */}
@@ -209,15 +254,21 @@ export default function AdminStudentsPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
-                <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-500 text-xs font-medium">
-                    Loading student directory...
-                  </td>
-                </tr>
+                <TableSkeletonRows rows={5} cols={6} />
               ) : filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-500 text-xs font-medium">
-                    No student records found.
+                  <td colSpan={6} className="p-12 text-center">
+                    <div className="max-w-xs mx-auto space-y-3">
+                      <span className="text-4xl block">👨‍🎓</span>
+                      <strong className="text-slate-900 block font-bold">No Students Found</strong>
+                      <p className="text-slate-500 text-xs font-medium">Try adjusting search query or add a new student.</p>
+                      <button
+                        onClick={openAddModal}
+                        className="px-4 py-2 rounded-xl bg-indigo-50 text-indigo-700 font-bold text-xs border border-indigo-200"
+                      >
+                        + Add First Student
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -262,7 +313,7 @@ export default function AdminStudentsPage() {
                           ✏️ Edit
                         </button>
                         <button
-                          onClick={() => handleDelete(s.id)}
+                          onClick={() => setDeleteTargetId(s.id)}
                           className="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white font-bold text-xs transition"
                         >
                           🗑️
@@ -302,7 +353,7 @@ export default function AdminStudentsPage() {
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600 font-medium"
                   />
                 </div>
 
@@ -312,7 +363,7 @@ export default function AdminStudentsPage() {
                     type="text"
                     value={rollNo}
                     onChange={(e) => setRollNo(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600 font-medium"
                   />
                 </div>
               </div>
@@ -325,7 +376,7 @@ export default function AdminStudentsPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600 font-medium"
                   />
                 </div>
 
@@ -336,7 +387,7 @@ export default function AdminStudentsPage() {
                     required
                     value={studentClass}
                     onChange={(e) => setStudentClass(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600 font-medium"
                   />
                 </div>
               </div>
@@ -348,7 +399,7 @@ export default function AdminStudentsPage() {
                     type="text"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600 font-medium"
                   />
                 </div>
 
@@ -361,7 +412,7 @@ export default function AdminStudentsPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder={editingId ? "Leave empty to keep" : "Default: student123"}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600 font-medium"
                   />
                 </div>
               </div>
@@ -372,7 +423,7 @@ export default function AdminStudentsPage() {
                   rows={2}
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600 resize-none"
+                  className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600 resize-none font-medium"
                 />
               </div>
 
@@ -396,6 +447,16 @@ export default function AdminStudentsPage() {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={Boolean(deleteTargetId)}
+        title="Remove Student Record"
+        message="Are you sure you want to delete this student profile? This action cannot be undone."
+        confirmText="Yes, Delete Student"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTargetId(null)}
+      />
     </div>
   );
 }

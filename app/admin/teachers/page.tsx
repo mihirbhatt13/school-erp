@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { exportToCSV } from "@/lib/csvExport";
+import { showToast } from "@/app/components/Toast";
+import ConfirmModal from "@/app/components/ConfirmModal";
+import { TableSkeletonRows } from "@/app/components/SkeletonLoader";
 
 interface Teacher {
   id: number;
@@ -34,6 +38,9 @@ export default function AdminTeachersPage() {
   const [password, setPassword] = useState("teacher123");
   const [submitting, setSubmitting] = useState(false);
 
+  // Delete Confirm State
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+
   useEffect(() => {
     fetchTeachers();
   }, []);
@@ -47,6 +54,7 @@ export default function AdminTeachersPage() {
       setFilteredTeachers(list);
     } catch (err) {
       console.error(err);
+      showToast("Failed to load faculty directory.", "error");
     } finally {
       setLoading(false);
     }
@@ -68,6 +76,19 @@ export default function AdminTeachersPage() {
         t.teacherId?.toLowerCase().includes(q)
     );
     setFilteredTeachers(matched);
+  }
+
+  function handleExportCSV() {
+    exportToCSV("faculty_directory", filteredTeachers, [
+      { key: "id", label: "ID" },
+      { key: "teacherId", label: "Teacher ID" },
+      { key: "name", label: "Full Name" },
+      { key: "subject", label: "Subject Specialization" },
+      { key: "assignedClass", label: "Assigned Class" },
+      { key: "email", label: "Email Address" },
+      { key: "phone", label: "Phone Number" },
+    ]);
+    showToast("Faculty directory exported to CSV file.", "info");
   }
 
   function openAddModal() {
@@ -130,22 +151,37 @@ export default function AdminTeachersPage() {
 
       if (res.ok) {
         setShowModal(false);
+        showToast(
+          editingId ? `Updated faculty profile for ${name}` : `Added faculty member ${name}`,
+          "success"
+        );
         fetchTeachers();
+      } else {
+        showToast("Failed to save faculty record.", "error");
       }
     } catch (err) {
       console.error(err);
+      showToast("Error saving faculty record.", "error");
     } finally {
       setSubmitting(false);
     }
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm("Are you sure you want to remove this faculty record?")) return;
+  async function confirmDelete() {
+    if (!deleteTargetId) return;
     try {
-      const res = await fetch(`/api/teachers/${id}`, { method: "DELETE" });
-      if (res.ok) fetchTeachers();
+      const res = await fetch(`/api/teachers/${deleteTargetId}`, { method: "DELETE" });
+      if (res.ok) {
+        showToast("Faculty record removed.", "warning");
+        fetchTeachers();
+      } else {
+        showToast("Failed to delete faculty member.", "error");
+      }
     } catch (err) {
       console.error(err);
+      showToast("Error deleting faculty record.", "error");
+    } finally {
+      setDeleteTargetId(null);
     }
   }
 
@@ -164,13 +200,22 @@ export default function AdminTeachersPage() {
           />
         </div>
 
-        <button
-          onClick={openAddModal}
-          className="px-5 py-2.5 rounded-xl bg-indigo-700 hover:bg-indigo-600 text-white font-bold text-xs shadow-md flex items-center justify-center gap-2 transition"
-        >
-          <span>➕</span>
-          <span>Add Faculty Member</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCSV}
+            className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition"
+          >
+            <span>📥</span>
+            <span>Export CSV</span>
+          </button>
+          <button
+            onClick={openAddModal}
+            className="px-5 py-2.5 rounded-xl bg-indigo-700 hover:bg-indigo-600 text-white font-bold text-xs shadow-md flex items-center justify-center gap-2 transition"
+          >
+            <span>➕</span>
+            <span>Add Faculty</span>
+          </button>
+        </div>
       </div>
 
       {/* Teachers Directory Table */}
@@ -189,15 +234,21 @@ export default function AdminTeachersPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
-                <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-500 text-xs font-medium">
-                    Loading faculty directory...
-                  </td>
-                </tr>
+                <TableSkeletonRows rows={5} cols={6} />
               ) : filteredTeachers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-500 text-xs font-medium">
-                    No faculty records found.
+                  <td colSpan={6} className="p-12 text-center">
+                    <div className="max-w-xs mx-auto space-y-3">
+                      <span className="text-4xl block">👨‍🏫</span>
+                      <strong className="text-slate-900 block font-bold">No Faculty Records</strong>
+                      <p className="text-slate-500 text-xs font-medium">Try adjusting search or add a new faculty member.</p>
+                      <button
+                        onClick={openAddModal}
+                        className="px-4 py-2 rounded-xl bg-indigo-50 text-indigo-700 font-bold text-xs border border-indigo-200"
+                      >
+                        + Add First Teacher
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -242,7 +293,7 @@ export default function AdminTeachersPage() {
                           ✏️ Edit
                         </button>
                         <button
-                          onClick={() => handleDelete(t.id)}
+                          onClick={() => setDeleteTargetId(t.id)}
                           className="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white font-bold text-xs transition"
                         >
                           🗑️
@@ -282,7 +333,7 @@ export default function AdminTeachersPage() {
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600 font-medium"
                   />
                 </div>
 
@@ -293,7 +344,7 @@ export default function AdminTeachersPage() {
                     required
                     value={teacherId}
                     onChange={(e) => setTeacherId(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600 font-medium"
                   />
                 </div>
               </div>
@@ -306,7 +357,7 @@ export default function AdminTeachersPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600 font-medium"
                   />
                 </div>
 
@@ -317,7 +368,7 @@ export default function AdminTeachersPage() {
                     required
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600 font-medium"
                   />
                 </div>
               </div>
@@ -330,7 +381,7 @@ export default function AdminTeachersPage() {
                     required
                     value={assignedClass}
                     onChange={(e) => setAssignedClass(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600 font-medium"
                   />
                 </div>
 
@@ -340,7 +391,7 @@ export default function AdminTeachersPage() {
                     type="text"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600 font-medium"
                   />
                 </div>
               </div>
@@ -354,7 +405,7 @@ export default function AdminTeachersPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={editingId ? "Leave empty to keep" : "Default: teacher123"}
-                  className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
+                  className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600 font-medium"
                 />
               </div>
 
@@ -378,6 +429,16 @@ export default function AdminTeachersPage() {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={Boolean(deleteTargetId)}
+        title="Remove Faculty Member"
+        message="Are you sure you want to delete this faculty record? This action cannot be undone."
+        confirmText="Yes, Delete Record"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTargetId(null)}
+      />
     </div>
   );
 }
