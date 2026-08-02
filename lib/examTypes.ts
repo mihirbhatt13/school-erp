@@ -1,0 +1,17 @@
+export const DEFAULT_EXAM_TYPES = [
+  "Unit Test 1",
+  "Unit Test 2",
+  "Unit Test 3",
+  "Monthly Test",
+  "Weekly Test",
+  "Surprise Test",
+  "Half Yearly Examination",
+  "Mid Term Examination",
+  "Annual Examination",
+  "Final Examination",
+  "Practical Examination",
+  "Oral Examination",
+  "Pre Board Examination",
+  "Board Examination",
+  "Other",
+];

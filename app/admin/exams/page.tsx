@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { DEFAULT_EXAM_TYPES } from "@/lib/examTypes";
+import { exportToCSV } from "@/lib/csvExport";
+import { showToast } from "@/app/components/Toast";
+import ConfirmModal from "@/app/components/ConfirmModal";
+import { TableSkeletonRows } from "@/app/components/SkeletonLoader";
 
 interface ExamItem {
   id: number;
@@ -24,12 +29,16 @@ export default function AdminExamsPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [subject, setSubject] = useState("");
   const [className, setClassName] = useState("Grade 10-A");
-  const [examType, setExamType] = useState("Mid-Term Exam");
+  const [selectedExamType, setSelectedExamType] = useState("Unit Test 1");
+  const [customExamType, setCustomExamType] = useState("");
   const [examDate, setExamDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [examTime, setExamTime] = useState("10:00 AM - 01:00 PM");
   const [totalMarks, setTotalMarks] = useState(100);
   const [passingMarks, setPassingMarks] = useState(40);
   const [submitting, setSubmitting] = useState(false);
+
+  // Delete Confirm State
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchExams();
@@ -44,6 +53,7 @@ export default function AdminExamsPage() {
       setFilteredExams(list);
     } catch (err) {
       console.error(err);
+      showToast("Error loading examination timetable.", "error");
     } finally {
       setLoading(false);
     }
@@ -66,11 +76,26 @@ export default function AdminExamsPage() {
     setFilteredExams(matched);
   }
 
+  function handleExportCSV() {
+    exportToCSV("examination_schedules", filteredExams, [
+      { key: "id", label: "Exam ID" },
+      { key: "subject", label: "Subject Name" },
+      { key: "className", label: "Target Class" },
+      { key: "examType", label: "Exam Type" },
+      { key: "examDate", label: "Date" },
+      { key: "examTime", label: "Timing" },
+      { key: "totalMarks", label: "Total Marks" },
+      { key: "passingMarks", label: "Passing Marks" },
+    ]);
+    showToast("Exam schedules exported to CSV file.", "info");
+  }
+
   function openAddModal() {
     setEditingId(null);
     setSubject("");
     setClassName("Grade 10-A");
-    setExamType("Mid-Term Exam");
+    setSelectedExamType("Unit Test 1");
+    setCustomExamType("");
     setExamDate(new Date().toISOString().split("T")[0]);
     setExamTime("10:00 AM - 01:00 PM");
     setTotalMarks(100);
@@ -82,7 +107,16 @@ export default function AdminExamsPage() {
     setEditingId(exam.id);
     setSubject(exam.subject);
     setClassName(exam.className);
-    setExamType(exam.examType || "Mid-Term Exam");
+    
+    const existingType = exam.examType || "Unit Test 1";
+    if (DEFAULT_EXAM_TYPES.includes(existingType)) {
+      setSelectedExamType(existingType);
+      setCustomExamType("");
+    } else {
+      setSelectedExamType("Other");
+      setCustomExamType(existingType);
+    }
+
     setExamDate(exam.examDate || new Date().toISOString().split("T")[0]);
     setExamTime(exam.examTime || "10:00 AM - 01:00 PM");
     setTotalMarks(exam.totalMarks || 100);
@@ -93,13 +127,20 @@ export default function AdminExamsPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!subject || !className) return;
+
+    const finalExamType = selectedExamType === "Other" ? customExamType : selectedExamType;
+    if (!finalExamType) {
+      showToast("Please specify the exam type.", "warning");
+      return;
+    }
+
     setSubmitting(true);
 
     try {
       const payload = {
         subject,
         className,
-        examType,
+        examType: finalExamType,
         examDate,
         examTime,
         totalMarks: Number(totalMarks),
@@ -123,22 +164,37 @@ export default function AdminExamsPage() {
 
       if (res.ok) {
         setShowModal(false);
+        showToast(
+          editingId ? `Updated ${finalExamType} schedule for ${subject}` : `Scheduled ${finalExamType} for ${subject}`,
+          "success"
+        );
         fetchExams();
+      } else {
+        showToast("Failed to save exam schedule.", "error");
       }
     } catch (err) {
       console.error(err);
+      showToast("Error saving exam schedule.", "error");
     } finally {
       setSubmitting(false);
     }
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm("Are you sure you want to remove this exam schedule?")) return;
+  async function confirmDelete() {
+    if (!deleteTargetId) return;
     try {
-      const res = await fetch(`/api/exams/${id}`, { method: "DELETE" });
-      if (res.ok) fetchExams();
+      const res = await fetch(`/api/exams/${deleteTargetId}`, { method: "DELETE" });
+      if (res.ok) {
+        showToast("Exam schedule removed.", "warning");
+        fetchExams();
+      } else {
+        showToast("Failed to delete exam schedule.", "error");
+      }
     } catch (err) {
       console.error(err);
+      showToast("Error removing exam schedule.", "error");
+    } finally {
+      setDeleteTargetId(null);
     }
   }
 
@@ -157,13 +213,22 @@ export default function AdminExamsPage() {
           />
         </div>
 
-        <button
-          onClick={openAddModal}
-          className="px-5 py-2.5 rounded-xl bg-indigo-700 hover:bg-indigo-600 text-white font-bold text-xs shadow-md flex items-center justify-center gap-2 transition"
-        >
-          <span>➕</span>
-          <span>Schedule New Exam</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCSV}
+            className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition"
+          >
+            <span>📥</span>
+            <span>Export CSV</span>
+          </button>
+          <button
+            onClick={openAddModal}
+            className="px-5 py-2.5 rounded-xl bg-indigo-700 hover:bg-indigo-600 text-white font-bold text-xs shadow-md flex items-center justify-center gap-2 transition"
+          >
+            <span>➕</span>
+            <span>Schedule New Exam</span>
+          </button>
+        </div>
       </div>
 
       {/* Exams Table */}
@@ -182,14 +247,10 @@ export default function AdminExamsPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
-                <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-500 text-xs font-medium">
-                    Loading exam schedules...
-                  </td>
-                </tr>
+                <TableSkeletonRows rows={5} cols={6} />
               ) : filteredExams.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-500 text-xs font-medium">
+                  <td colSpan={6} className="p-12 text-center text-slate-500 text-xs font-medium">
                     No examination schedules found.
                   </td>
                 </tr>
@@ -200,7 +261,7 @@ export default function AdminExamsPage() {
                     <td className="p-4 text-xs font-bold text-slate-700">{e.className}</td>
                     <td className="p-4 text-xs">
                       <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold border border-indigo-100">
-                        {e.examType || "Term Test"}
+                        {e.examType || "Unit Test 1"}
                       </span>
                     </td>
                     <td className="p-4 text-xs font-medium text-slate-600">
@@ -219,7 +280,7 @@ export default function AdminExamsPage() {
                           ✏️ Edit
                         </button>
                         <button
-                          onClick={() => handleDelete(e.id)}
+                          onClick={() => setDeleteTargetId(e.id)}
                           className="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white font-bold text-xs transition"
                         >
                           🗑️
@@ -257,9 +318,10 @@ export default function AdminExamsPage() {
                   <input
                     type="text"
                     required
+                    placeholder="e.g. Mathematics"
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600 font-medium"
                   />
                 </div>
 
@@ -268,55 +330,72 @@ export default function AdminExamsPage() {
                   <input
                     type="text"
                     required
+                    placeholder="e.g. Grade 10-A"
                     value={className}
                     onChange={(e) => setClassName(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600 font-medium"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Exam Type</label>
+              {/* SEARCHABLE EXAM TYPE DROPDOWN */}
+              <div className="space-y-2">
+                <label className="block font-bold text-slate-700 mb-1">Exam Type Category *</label>
+                <select
+                  value={selectedExamType}
+                  onChange={(e) => setSelectedExamType(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-indigo-600"
+                >
+                  {DEFAULT_EXAM_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+
+                {selectedExamType === "Other" && (
                   <input
                     type="text"
                     required
-                    value={examType}
-                    onChange={(e) => setExamType(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
+                    placeholder="Enter custom examination name..."
+                    value={customExamType}
+                    onChange={(e) => setCustomExamType(e.target.value)}
+                    className="w-full bg-white border border-indigo-500 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none font-medium mt-2"
                   />
-                </div>
+                )}
+              </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Exam Date</label>
+                  <label className="block font-bold text-slate-700 mb-1">Exam Date *</label>
                   <input
                     type="date"
                     required
                     value={examDate}
                     onChange={(e) => setExamDate(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600 font-medium"
                   />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Exam Timing</label>
                   <input
                     type="text"
                     value={examTime}
                     onChange={(e) => setExamTime(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600 font-medium"
                   />
                 </div>
+              </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Total Marks</label>
                   <input
                     type="number"
                     value={totalMarks}
                     onChange={(e) => setTotalMarks(Number(e.target.value))}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600 font-medium"
                   />
                 </div>
 
@@ -326,7 +405,7 @@ export default function AdminExamsPage() {
                     type="number"
                     value={passingMarks}
                     onChange={(e) => setPassingMarks(Number(e.target.value))}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600 font-medium"
                   />
                 </div>
               </div>
@@ -351,6 +430,16 @@ export default function AdminExamsPage() {
           </div>
         </div>
       )}
+
+      {/* Delete Confirm Modal */}
+      <ConfirmModal
+        isOpen={Boolean(deleteTargetId)}
+        title="Remove Examination Schedule"
+        message="Are you sure you want to delete this exam schedule? This action cannot be undone."
+        confirmText="Yes, Delete Exam"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTargetId(null)}
+      />
     </div>
   );
 }

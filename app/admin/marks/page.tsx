@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { DEFAULT_EXAM_TYPES } from "@/lib/examTypes";
+import { exportToCSV } from "@/lib/csvExport";
+import { showToast } from "@/app/components/Toast";
+import ConfirmModal from "@/app/components/ConfirmModal";
+import { TableSkeletonRows } from "@/app/components/SkeletonLoader";
 
 interface MarkItem {
   id: number;
@@ -27,11 +32,15 @@ export default function AdminMarksPage() {
   const [student, setStudent] = useState("");
   const [className, setClassName] = useState("Grade 10-A");
   const [subject, setSubject] = useState("Mathematics");
-  const [examType, setExamType] = useState("Mid-Term Exam");
+  const [selectedExamType, setSelectedExamType] = useState("Unit Test 1");
+  const [customExamType, setCustomExamType] = useState("");
   const [totalMarks, setTotalMarks] = useState(100);
   const [passingMarks, setPassingMarks] = useState(40);
   const [obtainedMarks, setObtainedMarks] = useState(85);
   const [submitting, setSubmitting] = useState(false);
+
+  // Delete Confirm State
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchMarks();
@@ -46,6 +55,7 @@ export default function AdminMarksPage() {
       setFilteredMarks(list);
     } catch (err) {
       console.error(err);
+      showToast("Error loading student marks.", "error");
     } finally {
       setLoading(false);
     }
@@ -68,13 +78,28 @@ export default function AdminMarksPage() {
     setFilteredMarks(matched);
   }
 
+  function handleExportCSV() {
+    exportToCSV("student_marks_report", filteredMarks, [
+      { key: "id", label: "Entry ID" },
+      { key: "student", label: "Student Name" },
+      { key: "className", label: "Class" },
+      { key: "subject", label: "Subject" },
+      { key: "examType", label: "Exam Type" },
+      { key: "obtainedMarks", label: "Marks Obtained" },
+      { key: "totalMarks", label: "Total Marks" },
+      { key: "passingMarks", label: "Passing Marks" },
+    ]);
+    showToast("Student marks ledger exported to CSV file.", "info");
+  }
+
   function openAddModal() {
     setEditingId(null);
     setStudentId(1);
     setStudent("");
     setClassName("Grade 10-A");
     setSubject("Mathematics");
-    setExamType("Mid-Term Exam");
+    setSelectedExamType("Unit Test 1");
+    setCustomExamType("");
     setTotalMarks(100);
     setPassingMarks(40);
     setObtainedMarks(85);
@@ -87,7 +112,16 @@ export default function AdminMarksPage() {
     setStudent(mark.student);
     setClassName(mark.className);
     setSubject(mark.subject);
-    setExamType(mark.examType);
+    
+    const existingType = mark.examType || "Unit Test 1";
+    if (DEFAULT_EXAM_TYPES.includes(existingType)) {
+      setSelectedExamType(existingType);
+      setCustomExamType("");
+    } else {
+      setSelectedExamType("Other");
+      setCustomExamType(existingType);
+    }
+
     setTotalMarks(mark.totalMarks);
     setPassingMarks(mark.passingMarks);
     setObtainedMarks(mark.obtainedMarks);
@@ -97,6 +131,13 @@ export default function AdminMarksPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!student || !subject) return;
+
+    const finalExamType = selectedExamType === "Other" ? customExamType : selectedExamType;
+    if (!finalExamType) {
+      showToast("Please specify the exam type.", "warning");
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -105,7 +146,7 @@ export default function AdminMarksPage() {
         student,
         className,
         subject,
-        examType,
+        examType: finalExamType,
         totalMarks: Number(totalMarks),
         passingMarks: Number(passingMarks),
         obtainedMarks: Number(obtainedMarks),
@@ -128,22 +169,37 @@ export default function AdminMarksPage() {
 
       if (res.ok) {
         setShowModal(false);
+        showToast(
+          editingId ? `Updated marks entry for ${student}` : `Recorded marks for ${student}`,
+          "success"
+        );
         fetchMarks();
+      } else {
+        showToast("Failed to save marks entry.", "error");
       }
     } catch (err) {
       console.error(err);
+      showToast("Error saving marks entry.", "error");
     } finally {
       setSubmitting(false);
     }
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm("Are you sure you want to delete this mark entry?")) return;
+  async function confirmDelete() {
+    if (!deleteTargetId) return;
     try {
-      const res = await fetch(`/api/marks/${id}`, { method: "DELETE" });
-      if (res.ok) fetchMarks();
+      const res = await fetch(`/api/marks/${deleteTargetId}`, { method: "DELETE" });
+      if (res.ok) {
+        showToast("Marks entry removed.", "warning");
+        fetchMarks();
+      } else {
+        showToast("Failed to delete marks entry.", "error");
+      }
     } catch (err) {
       console.error(err);
+      showToast("Error removing marks entry.", "error");
+    } finally {
+      setDeleteTargetId(null);
     }
   }
 
@@ -162,13 +218,22 @@ export default function AdminMarksPage() {
           />
         </div>
 
-        <button
-          onClick={openAddModal}
-          className="px-5 py-2.5 rounded-xl bg-indigo-700 hover:bg-indigo-600 text-white font-bold text-xs shadow-md flex items-center justify-center gap-2 transition"
-        >
-          <span>➕</span>
-          <span>Log Student Marks</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCSV}
+            className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition"
+          >
+            <span>📥</span>
+            <span>Export CSV</span>
+          </button>
+          <button
+            onClick={openAddModal}
+            className="px-5 py-2.5 rounded-xl bg-indigo-700 hover:bg-indigo-600 text-white font-bold text-xs shadow-md flex items-center justify-center gap-2 transition"
+          >
+            <span>➕</span>
+            <span>Log Student Marks</span>
+          </button>
+        </div>
       </div>
 
       {/* Marks Table */}
@@ -188,14 +253,10 @@ export default function AdminMarksPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
-                <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-500 text-xs font-medium">
-                    Loading student marks entry records...
-                  </td>
-                </tr>
+                <TableSkeletonRows rows={5} cols={7} />
               ) : filteredMarks.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-500 text-xs font-medium">
+                  <td colSpan={7} className="p-12 text-center text-slate-500 text-xs font-medium">
                     No student marks records found.
                   </td>
                 </tr>
@@ -209,7 +270,11 @@ export default function AdminMarksPage() {
                       <td className="p-4 font-bold text-slate-900">{m.student}</td>
                       <td className="p-4 text-xs font-bold text-slate-700">{m.className}</td>
                       <td className="p-4 text-xs font-bold text-indigo-700">{m.subject}</td>
-                      <td className="p-4 text-xs font-medium text-slate-600">{m.examType}</td>
+                      <td className="p-4 text-xs font-medium text-slate-600">
+                        <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold border border-indigo-100">
+                          {m.examType || "Unit Test 1"}
+                        </span>
+                      </td>
                       <td className="p-4 text-xs font-bold text-slate-900">
                         {m.obtainedMarks} / {m.totalMarks} <span className="text-slate-400 font-normal">({percentage}%)</span>
                       </td>
@@ -233,7 +298,7 @@ export default function AdminMarksPage() {
                             ✏️ Edit
                           </button>
                           <button
-                            onClick={() => handleDelete(m.id)}
+                            onClick={() => setDeleteTargetId(m.id)}
                             className="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white font-bold text-xs transition"
                           >
                             🗑️
@@ -272,9 +337,10 @@ export default function AdminMarksPage() {
                   <input
                     type="text"
                     required
+                    placeholder="e.g. Aarav Sharma"
                     value={student}
                     onChange={(e) => setStudent(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600 font-medium"
                   />
                 </div>
 
@@ -283,34 +349,52 @@ export default function AdminMarksPage() {
                   <input
                     type="text"
                     required
+                    placeholder="e.g. Grade 10-A"
                     value={className}
                     onChange={(e) => setClassName(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600 font-medium"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Subject</label>
+                  <label className="block font-bold text-slate-700 mb-1">Subject *</label>
                   <input
                     type="text"
                     required
+                    placeholder="e.g. Mathematics"
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600 font-medium"
                   />
                 </div>
 
+                {/* SEARCHABLE EXAM TYPE DROPDOWN */}
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Exam Type</label>
-                  <input
-                    type="text"
-                    required
-                    value={examType}
-                    onChange={(e) => setExamType(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-600"
-                  />
+                  <label className="block font-bold text-slate-700 mb-1">Exam Type Category *</label>
+                  <select
+                    value={selectedExamType}
+                    onChange={(e) => setSelectedExamType(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-indigo-600"
+                  >
+                    {DEFAULT_EXAM_TYPES.map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
+
+                  {selectedExamType === "Other" && (
+                    <input
+                      type="text"
+                      required
+                      placeholder="Enter custom examination name..."
+                      value={customExamType}
+                      onChange={(e) => setCustomExamType(e.target.value)}
+                      className="w-full bg-white border border-indigo-500 text-slate-900 rounded-xl px-3 py-2 text-xs outline-none font-medium mt-2"
+                    />
+                  )}
                 </div>
               </div>
 
@@ -369,6 +453,16 @@ export default function AdminMarksPage() {
           </div>
         </div>
       )}
+
+      {/* Delete Confirm Modal */}
+      <ConfirmModal
+        isOpen={Boolean(deleteTargetId)}
+        title="Remove Marks Entry"
+        message="Are you sure you want to delete this student marks record? This action cannot be undone."
+        confirmText="Yes, Delete Marks"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTargetId(null)}
+      />
     </div>
   );
 }
