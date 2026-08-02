@@ -1,6 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { exportToCSV } from "@/lib/csvExport";
+import { showToast } from "@/app/components/Toast";
+import ConfirmModal from "@/app/components/ConfirmModal";
+import { TableSkeletonRows } from "@/app/components/SkeletonLoader";
+
+interface Student {
+  id: number;
+  name: string;
+  class: string;
+  rollNo?: string;
+}
 
 interface AttendanceRecord {
   id: number;
@@ -12,30 +23,96 @@ interface AttendanceRecord {
   date: string;
 }
 
+interface ClassItem {
+  id: number;
+  className: string;
+  section: string;
+}
+
 export default function AdminAttendancePage() {
   const [logs, setLogs] = useState<AttendanceRecord[]>([]);
   const [filteredLogs, setFilteredLogs] = useState<AttendanceRecord[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [classList, setClassList] = useState<string[]>([]);
+  
   const [search, setSearch] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
   const [loading, setLoading] = useState(true);
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+
+  // Take Attendance Modal State
+  const [showTakeModal, setShowTakeModal] = useState(false);
+  const [modalClass, setModalClass] = useState("Grade 10-A");
+  const [modalDate, setModalDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [classStudents, setClassStudents] = useState<Student[]>([]);
+  const [attendanceStates, setAttendanceStates] = useState<Record<number, "Present" | "Absent" | "Late" | "Leave">>({});
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    fetchLogs();
+    loadData();
   }, []);
 
-  async function fetchLogs() {
+  async function loadData() {
     try {
-      const res = await fetch("/api/attendance");
-      const data = await res.json();
-      const list = Array.isArray(data) ? data : [];
-      setLogs(list);
-      setFilteredLogs(list);
+      const [attendanceRes, studentsRes, classesRes] = await Promise.all([
+        fetch("/api/attendance"),
+        fetch("/api/students"),
+        fetch("/api/classes"),
+      ]);
+
+      const attendanceData: AttendanceRecord[] = await attendanceRes.json();
+      const studentsData: Student[] = await studentsRes.json();
+      const classesData: ClassItem[] = await classesRes.json();
+
+      const logList = Array.isArray(attendanceData) ? attendanceData : [];
+      setLogs(logList);
+      setFilteredLogs(logList);
+
+      const stuList = Array.isArray(studentsData) ? studentsData : [];
+      setStudents(stuList);
+
+      // Extract unique classes
+      const rawClasses: string[] = [];
+      if (Array.isArray(classesData)) {
+        classesData.forEach((c) => rawClasses.push(`${c.className}-${c.section}`));
+      }
+      stuList.forEach((s) => {
+        if (s.class && !rawClasses.includes(s.class)) rawClasses.push(s.class);
+      });
+
+      const uniqueClasses = Array.from(new Set(rawClasses)).filter(Boolean);
+      setClassList(uniqueClasses.length > 0 ? uniqueClasses : ["Grade 10-A", "Grade 9-B"]);
+      if (uniqueClasses.length > 0) setModalClass(uniqueClasses[0]);
     } catch (err) {
-      console.error(err);
+      console.error("Error loading attendance data:", err);
+      showToast("Error loading attendance data.", "error");
     } finally {
       setLoading(false);
     }
   }
+
+  // Load class students when modal opens or modalClass changes
+  useEffect(() => {
+    if (!showTakeModal) return;
+    const targetStudents = students.filter(
+      (s) => s.class.toLowerCase() === modalClass.toLowerCase()
+    );
+    setClassStudents(targetStudents);
+
+    // Initialize attendance states with existing records or default to "Present"
+    const initial: Record<number, "Present" | "Absent" | "Late" | "Leave"> = {};
+    targetStudents.forEach((s) => {
+      const existing = logs.find(
+        (l) => l.studentId === s.id && l.date === modalDate
+      );
+      if (existing && ["Present", "Absent", "Late", "Leave"].includes(existing.status)) {
+        initial[s.id] = existing.status as any;
+      } else {
+        initial[s.id] = "Present";
+      }
+    });
+    setAttendanceStates(initial);
+  }, [showTakeModal, modalClass, modalDate, students, logs]);
 
   function handleFilter(query: string, dt: string) {
     setSearch(query);
@@ -59,28 +136,149 @@ export default function AdminAttendancePage() {
     setFilteredLogs(list);
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm("Are you sure you want to delete this attendance record?")) return;
+  function handleExportCSV() {
+    exportToCSV("attendance_master_log", filteredLogs, [
+      { key: "id", label: "Log ID" },
+      { key: "date", label: "Date" },
+      { key: "student", label: "Student Name" },
+      { key: "className", label: "Class Assigned" },
+      { key: "status", label: "Attendance Status" },
+    ]);
+    showToast("Attendance master log exported to CSV file.", "info");
+  }
+
+  function handleMarkAll(status: "Present" | "Absent" | "Late" | "Leave") {
+    const updated: Record<number, "Present" | "Absent" | "Late" | "Leave"> = {};
+    classStudents.forEach((s) => {
+      updated[s.id] = status;
+    });
+    setAttendanceStates(updated);
+    showToast(`All students marked as ${status}.`, "info");
+  }
+
+  function handleResetModal() {
+    const reset: Record<number, "Present" | "Absent" | "Late" | "Leave"> = {};
+    classStudents.forEach((s) => {
+      reset[s.id] = "Present";
+    });
+    setAttendanceStates(reset);
+    showToast("Attendance reset to default Present.", "info");
+  }
+
+  async function handleSaveAttendance(e: React.FormEvent) {
+    e.preventDefault();
+    if (classStudents.length === 0) {
+      showToast("No students found in selected class.", "warning");
+      return;
+    }
+
+    setSubmitting(true);
+
     try {
-      const res = await fetch(`/api/attendance/${id}`, { method: "DELETE" });
-      if (res.ok) fetchLogs();
+      let savedCount = 0;
+
+      for (const student of classStudents) {
+        const status = attendanceStates[student.id] || "Present";
+        const res = await fetch("/api/attendance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            studentId: student.id,
+            student: student.name,
+            className: modalClass,
+            date: modalDate,
+            status: status,
+          }),
+        });
+
+        if (res.ok) savedCount++;
+      }
+
+      if (savedCount > 0) {
+        setShowTakeModal(false);
+        showToast(
+          `Successfully recorded attendance for ${savedCount} students in ${modalClass} on ${modalDate}.`,
+          "success"
+        );
+        loadData();
+      } else {
+        showToast("Failed to save attendance records.", "error");
+      }
+    } catch (err) {
+      console.error("Error saving attendance:", err);
+      showToast("Error submitting attendance register.", "error");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTargetId) return;
+    try {
+      const res = await fetch(`/api/attendance/${deleteTargetId}`, { method: "DELETE" });
+      if (res.ok) {
+        showToast("Attendance record removed.", "warning");
+        loadData();
+      } else {
+        showToast("Failed to delete record.", "error");
+      }
     } catch (err) {
       console.error(err);
+      showToast("Error deleting record.", "error");
+    } finally {
+      setDeleteTargetId(null);
     }
   }
 
   const presentCount = logs.filter((l) => l.status?.toLowerCase() === "present").length;
   const absentCount = logs.filter((l) => l.status?.toLowerCase() === "absent").length;
   const lateCount = logs.filter((l) => l.status?.toLowerCase() === "late").length;
+  const leaveCount = logs.filter((l) => l.status?.toLowerCase() === "leave").length;
+  const totalLogs = logs.length;
+  const attendanceRate = totalLogs > 0 ? Math.round((presentCount / totalLogs) * 100) : 100;
 
   return (
     <div className="space-y-6">
+      {/* Top Action Header with Prominent Take Attendance Button */}
+      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-md flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+        <div>
+          <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-100 uppercase tracking-wider">
+            Daily Presence Register
+          </span>
+          <h2 className="text-2xl font-extrabold font-heading text-slate-900 mt-1">
+            Attendance Desk
+          </h2>
+          <p className="text-slate-500 text-xs mt-0.5 font-medium">
+            Record daily student presence, review historical logs, and monitor attendance metrics.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExportCSV}
+            className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition"
+          >
+            <span>📥</span>
+            <span>Export CSV</span>
+          </button>
+
+          <button
+            onClick={() => setShowTakeModal(true)}
+            className="px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition hover:scale-105"
+          >
+            <span className="text-base">📋</span>
+            <span>Take Attendance</span>
+          </button>
+        </div>
+      </div>
+
       {/* Attendance Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-md flex items-center justify-between">
           <div>
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Total Present</p>
-            <h3 className="text-3xl font-extrabold text-emerald-600 mt-1">{presentCount}</h3>
+            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Present Score</p>
+            <h3 className="text-3xl font-extrabold text-emerald-600 mt-1">{attendanceRate}%</h3>
+            <span className="text-slate-400 text-[11px] font-medium">{presentCount} Present</span>
           </div>
           <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center text-xl font-bold">
             ✓
@@ -91,6 +289,7 @@ export default function AdminAttendancePage() {
           <div>
             <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Total Absent</p>
             <h3 className="text-3xl font-extrabold text-rose-600 mt-1">{absentCount}</h3>
+            <span className="text-slate-400 text-[11px] font-medium">Unexcused</span>
           </div>
           <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center text-xl font-bold">
             ✕
@@ -100,15 +299,27 @@ export default function AdminAttendancePage() {
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-md flex items-center justify-between">
           <div>
             <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Total Late</p>
-            <h3 className="text-3xl font-extrabold text-amber-600 mt-1">{lateCount}</h3>
+            <h3 className="text-3xl font-extrabold text-amber-500 mt-1">{lateCount}</h3>
+            <span className="text-slate-400 text-[11px] font-medium">Tardy Arrival</span>
           </div>
           <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center text-xl font-bold">
             ⏱
           </div>
         </div>
+
+        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-md flex items-center justify-between">
+          <div>
+            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">On Leave</p>
+            <h3 className="text-3xl font-extrabold text-indigo-600 mt-1">{leaveCount}</h3>
+            <span className="text-slate-400 text-[11px] font-medium">Approved Leave</span>
+          </div>
+          <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center text-xl font-bold">
+            📝
+          </div>
+        </div>
       </div>
 
-      {/* Header & Controls */}
+      {/* Search & Date Filter Bar */}
       <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-md flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
         <div className="relative flex-1">
           <span className="absolute left-3.5 top-2.5 text-slate-400">🔍</span>
@@ -154,15 +365,21 @@ export default function AdminAttendancePage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
-                <tr>
-                  <td colSpan={5} className="p-8 text-center text-slate-500 text-xs font-medium">
-                    Loading attendance records...
-                  </td>
-                </tr>
+                <TableSkeletonRows rows={5} cols={5} />
               ) : filteredLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-slate-500 text-xs font-medium">
-                    No attendance records found matching filters.
+                  <td colSpan={5} className="p-12 text-center">
+                    <div className="max-w-xs mx-auto space-y-3">
+                      <span className="text-4xl block">📋</span>
+                      <strong className="text-slate-900 block font-bold">No Attendance Records</strong>
+                      <p className="text-slate-500 text-xs font-medium">Click Take Attendance to log student presence.</p>
+                      <button
+                        onClick={() => setShowTakeModal(true)}
+                        className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow-md"
+                      >
+                        + Take Attendance Now
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -182,6 +399,8 @@ export default function AdminAttendancePage() {
                             ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
                             : item.status?.toLowerCase() === "late"
                             ? "bg-amber-100 text-amber-800 border border-amber-200"
+                            : item.status?.toLowerCase() === "leave"
+                            ? "bg-indigo-100 text-indigo-800 border border-indigo-200"
                             : "bg-rose-100 text-rose-800 border border-rose-200"
                         }`}
                       >
@@ -190,7 +409,7 @@ export default function AdminAttendancePage() {
                     </td>
                     <td className="p-4 text-right">
                       <button
-                        onClick={() => handleDelete(item.id)}
+                        onClick={() => setDeleteTargetId(item.id)}
                         className="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white font-bold text-xs transition"
                       >
                         🗑️ Delete
@@ -203,6 +422,192 @@ export default function AdminAttendancePage() {
           </table>
         </div>
       </div>
+
+      {/* TAKE ATTENDANCE MODAL */}
+      {showTakeModal && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl border border-slate-200 space-y-6 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4 flex-shrink-0">
+              <div>
+                <h3 className="text-xl font-bold font-heading text-slate-900 flex items-center gap-2">
+                  <span>📋</span>
+                  <span>Take Class Attendance</span>
+                </h3>
+                <p className="text-slate-500 text-xs mt-0.5 font-medium">
+                  Select class and date to log or update student attendance.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowTakeModal(false)}
+                className="text-slate-400 hover:text-slate-700 font-bold p-1 text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Select Class & Date Controls */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-shrink-0 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Select Class *</label>
+                <select
+                  value={modalClass}
+                  onChange={(e) => setModalClass(e.target.value)}
+                  className="w-full bg-white border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-indigo-600"
+                >
+                  {classList.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Attendance Date *</label>
+                <input
+                  type="date"
+                  value={modalDate}
+                  onChange={(e) => setModalDate(e.target.value)}
+                  className="w-full bg-white border border-slate-300 text-slate-900 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-indigo-600"
+                />
+              </div>
+            </div>
+
+            {/* Quick Action Batch Controls */}
+            <div className="flex flex-wrap items-center justify-between gap-2 flex-shrink-0 pb-2 border-b border-slate-100">
+              <span className="text-xs font-bold text-slate-600">
+                Students ({classStudents.length})
+              </span>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleMarkAll("Present")}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-[11px] hover:bg-emerald-600 hover:text-white transition"
+                >
+                  ✓ All Present
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMarkAll("Absent")}
+                  className="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 font-bold text-[11px] hover:bg-rose-600 hover:text-white transition"
+                >
+                  ✕ All Absent
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetModal}
+                  className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 font-bold text-[11px] hover:bg-slate-200 transition"
+                >
+                  ↺ Reset
+                </button>
+              </div>
+            </div>
+
+            {/* Student List */}
+            <form onSubmit={handleSaveAttendance} className="flex-1 overflow-y-auto space-y-4 pr-1">
+              {classStudents.length === 0 ? (
+                <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                  <p className="text-xs font-bold text-slate-700">No students registered in {modalClass}.</p>
+                  <p className="text-[11px] text-slate-500">Please register students to this class in Student Management.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {classStudents.map((student) => {
+                    const status = attendanceStates[student.id] || "Present";
+
+                    return (
+                      <div
+                        key={student.id}
+                        className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-slate-300 transition"
+                      >
+                        <div>
+                          <strong className="text-slate-900 block font-bold text-xs">{student.name}</strong>
+                          <span className="text-slate-400 text-[11px] font-medium">Roll: {student.rollNo || `#${student.id}`}</span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                          <button
+                            type="button"
+                            onClick={() => setAttendanceStates({ ...attendanceStates, [student.id]: "Present" })}
+                            className={`px-3 py-1 rounded-xl text-[11px] font-bold transition ${
+                              status === "Present"
+                                ? "bg-emerald-600 text-white shadow-xs"
+                                : "bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700"
+                            }`}
+                          >
+                            Present
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAttendanceStates({ ...attendanceStates, [student.id]: "Absent" })}
+                            className={`px-3 py-1 rounded-xl text-[11px] font-bold transition ${
+                              status === "Absent"
+                                ? "bg-rose-600 text-white shadow-xs"
+                                : "bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-700"
+                            }`}
+                          >
+                            Absent
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAttendanceStates({ ...attendanceStates, [student.id]: "Late" })}
+                            className={`px-3 py-1 rounded-xl text-[11px] font-bold transition ${
+                              status === "Late"
+                                ? "bg-amber-500 text-white shadow-xs"
+                                : "bg-slate-100 text-slate-600 hover:bg-amber-50 hover:text-amber-700"
+                            }`}
+                          >
+                            Late
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAttendanceStates({ ...attendanceStates, [student.id]: "Leave" })}
+                            className={`px-3 py-1 rounded-xl text-[11px] font-bold transition ${
+                              status === "Leave"
+                                ? "bg-indigo-600 text-white shadow-xs"
+                                : "bg-slate-100 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700"
+                            }`}
+                          >
+                            Leave
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowTakeModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting || classStudents.length === 0}
+                  className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-md disabled:opacity-50"
+                >
+                  {submitting ? "Saving Attendance..." : "Save Attendance Register"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={Boolean(deleteTargetId)}
+        title="Remove Attendance Record"
+        message="Are you sure you want to delete this attendance log? This action cannot be undone."
+        confirmText="Yes, Delete Log"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTargetId(null)}
+      />
     </div>
   );
 }
