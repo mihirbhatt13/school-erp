@@ -109,16 +109,48 @@ export default function NoticePage() {
             setDate("");
             setShowModal(true);
           }}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg mb-6"
+          className="bg-blue-600 hover:bg-blue-700 transition text-white px-6 py-3 rounded-lg whitespace-nowrap shadow mb-6"
         >
           + Add Notice
         </button>
 
-        <div className="overflow-x-auto">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
 
-          <table className="w-full border border-gray-300">
+  <div className="bg-blue-600 text-white rounded-xl p-5 shadow">
+    <p className="text-lg">Total Notices</p>
 
-            <thead className="bg-blue-600 text-white">
+    <h2 className="text-4xl font-bold">
+      {notices.length}
+    </h2>
+  </div>
+
+  <div className="bg-green-600 text-white rounded-xl p-5 shadow">
+    <p className="text-lg">Today's Notices</p>
+
+    <h2 className="text-4xl font-bold">
+      {
+        notices.filter(
+          n => n.date === new Date().toISOString().split("T")[0]
+        ).length
+      }
+    </h2>
+  </div>
+
+  <div className="bg-purple-600 text-white rounded-xl p-5 shadow">
+    <p className="text-lg">Search Results</p>
+
+    <h2 className="text-4xl font-bold">
+      {filteredNotices.length}
+    </h2>
+  </div>
+
+</div>
+
+        <div className="overflow-x-auto rounded-xl">
+
+          <table className="min-w-full border border-gray-300 rounded-xl overflow-hidden">
+
+            <thead className="bg-blue-600 text-white sticky top-0">
 
               <tr>
                 <th className="p-3">ID</th>
@@ -138,7 +170,7 @@ export default function NoticePage() {
 
                   <tr
                     key={notice.id}
-                    className="text-center border-b"
+                    className="text-center border-b hover:bg-gray-100 transition"
                   >
 
                     <td className="p-3">
@@ -149,12 +181,16 @@ export default function NoticePage() {
                       {notice.title}
                     </td>
 
-                    <td className="p-3">
+                    <td className="p-3 max-w-xs break-words">
                       {notice.description}
                     </td>
 
                     <td className="p-3">
-                      {notice.date}
+                      {new Date(notice.date).toLocaleDateString("en-IN", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+})}
                     </td>
 
                     <td className="p-3">
@@ -211,7 +247,7 @@ export default function NoticePage() {
 
         <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
 
-          <div className="bg-white rounded-xl shadow-xl w-[450px] p-6">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
 
             <h2 className="text-2xl font-bold text-blue-700 mb-5">
               {editingId !== null

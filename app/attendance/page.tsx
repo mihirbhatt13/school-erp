@@ -13,6 +13,7 @@ interface Attendance {
 export default function AttendancePage() {
   const [showModal, setShowModal] = useState(false);
 
+  const [studentId, setStudentId] = useState("");
   const [student, setStudent] = useState("");
   const [className, setClassName] = useState("");
   const [date, setDate] = useState("");
@@ -103,7 +104,7 @@ export default function AttendancePage() {
             setStudent("");
             setClassName("");
             setDate("");
-            setStatus("");
+            
             setShowModal(true);
           }}
           className="bg-blue-600 hover:bg-blue-700 transition text-white px-6 py-3 rounded-lg whitespace-nowrap shadow mb-6"
@@ -205,6 +206,14 @@ export default function AttendancePage() {
             <div className="space-y-4">
 
               <input
+  type="number"
+  placeholder="Student ID"
+  value={studentId}
+  onChange={(e) => setStudentId(e.target.value)}
+  className="w-full border border-gray-300 rounded-lg p-3 text-black"
+/>
+              
+              <input
                 type="text"
                 placeholder="Student Name"
                 value={student}
@@ -245,10 +254,11 @@ export default function AttendancePage() {
                 onClick={() => {
                   setShowModal(false);
                   setEditingId(null);
+                  setStudentId("");
                   setStudent("");
                   setClassName("");
                   setDate("");
-                  setStatus("");
+                  
                 }}
                 className="bg-gray-500 hover:bg-gray-600 text-white px-5 py-2 rounded-lg"
               >
@@ -270,26 +280,28 @@ export default function AttendancePage() {
                       headers: {
                         "Content-Type": "application/json",
                       },
-                      body: JSON.stringify({
-                        student,
-                        className,
-                        date,
-                        status,
-                      }),
+                     body: JSON.stringify({
+  studentId: Number(studentId),
+  student,
+  className,
+  date,
+  status,
+})
                     });
                   } else {
                     response = await fetch("/api/attendance", {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                      },
-                      body: JSON.stringify({
-                        student,
-                        className,
-                        date,
-                        status,
-                      }),
-                    });
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    studentId: Number(studentId),
+    student,
+    className,
+    date,
+    status,
+  }),
+});
                   }
 
                   if (response.ok) {
@@ -299,10 +311,11 @@ export default function AttendancePage() {
                         : "Attendance Added Successfully"
                     );
 
+                    setStudentId("");
                     setStudent("");
                     setClassName("");
                     setDate("");
-                    setStatus("");
+                    
                     setEditingId(null);
 
                     await loadAttendance();

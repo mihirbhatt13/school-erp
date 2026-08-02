@@ -8,17 +8,28 @@ datasource db {
 }
 
 model Student {
-  id      Int    @id @default(autoincrement())
-  name    String
-  email   String @unique
-  class   String
+  id           Int     @id @default(autoincrement())
+  rollNo       String? @unique
+  name         String
+  email        String  @unique
+  class        String
+  password     String?
+  phone        String?
+  address      String?
+  profileImage String?
 }
 
 model Teacher {
-  id      Int    @id @default(autoincrement())
-  name    String
-  email   String @unique
-  subject String
+  id            Int      @id @default(autoincrement())
+  teacherId     String   @unique
+  name          String
+  email         String   @unique
+  phone         String?
+  subject       String
+  assignedClass String
+  password      String?
+  address       String?
+  profileImage  String?
 }
 
 model Class {
@@ -28,7 +39,8 @@ model Class {
 }
 
 model Attendance {
-  id        Int      @id @default(autoincrement())
+  id        Int    @id @default(autoincrement())
+  studentId Int
   student   String
   className String
   date      String
@@ -52,6 +64,7 @@ model Exam {
   className    String
   examType     String
   examDate     String
+  examTime     String
   totalMarks   Int
   passingMarks Int
 }
@@ -67,5 +80,27 @@ model Admin {
   id        Int      @id @default(autoincrement())
   email     String   @unique
   password  String
+  createdAt DateTime @default(now())
+}
+
+model Mark {
+  id            Int    @id @default(autoincrement())
+  studentId     Int
+  student       String
+  className     String
+  subject       String
+  examType      String
+  totalMarks    Int
+  passingMarks  Int
+  obtainedMarks Int
+}
+
+model ContactInquiry {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String
+  phone     String?
+  category  String
+  message   String
   createdAt DateTime @default(now())
 }

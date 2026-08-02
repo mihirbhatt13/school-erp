@@ -8,8 +8,9 @@ interface Exam {
   className: string;
   examType: string;
   examDate: string;
+  examTime: string;
   totalMarks: number;
- passingMarks: number;
+  passingMarks: number;
 }
 
 export default function ExamsPage() {
@@ -20,6 +21,7 @@ export default function ExamsPage() {
   const [className, setClassName] = useState("");
   const [examType, setExamType] = useState("");
   const [examDate, setExamDate] = useState("");
+  const [examTime, setExamTime] = useState("");
 
   const [totalMarks, setTotalMarks] =
     useState<number | "">("");
@@ -155,6 +157,7 @@ export default function ExamsPage() {
             setClassName("");
             setExamType("");
             setExamDate("");
+            setExamTime("");
             setTotalMarks("");
             setPassingMarks("");
             setShowModal(true);
@@ -162,6 +165,7 @@ export default function ExamsPage() {
           className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg mb-6"
         >
           + Add Exam
+          
         </button>
 
         <div className="overflow-x-auto">
@@ -177,6 +181,7 @@ export default function ExamsPage() {
                 <th className="p-3">Class</th>
                 <th className="p-3">Exam Type</th>
                 <th className="p-3">Exam Date</th>
+                <th className="p-3">Exam Time</th>
                 <th className="p-3">Total Marks</th>
                 <th className="p-3">Passing Marks</th>
                 <th className="p-3">Actions</th>
@@ -228,6 +233,10 @@ export default function ExamsPage() {
                       {exam.examDate}
                     </td>
 
+                    <td className="p-3">
+  {exam.examTime}
+</td>
+
                     <td className="p-3 font-semibold">
                       {exam.totalMarks}
                     </td>
@@ -245,6 +254,7 @@ export default function ExamsPage() {
                           setClassName(exam.className);
                           setExamType(exam.examType);
                           setExamDate(exam.examDate);
+                          setExamTime(exam.examTime);
                           setTotalMarks(exam.totalMarks);
                           setPassingMarks(exam.passingMarks);
                           setShowModal(true);
@@ -272,7 +282,7 @@ export default function ExamsPage() {
                 <tr>
 
                   <td
-                    colSpan={8}
+                    colSpan={9}
                     className="text-center p-8 text-red-500 font-semibold"
                   >
                     No Exams Found
@@ -357,6 +367,13 @@ export default function ExamsPage() {
               />
 
               <input
+  type="time"
+  value={examTime}
+  onChange={(e) => setExamTime(e.target.value)}
+  className="w-full border border-gray-300 rounded-lg p-3 text-black"
+/>
+
+              <input
                 type="number"
                 placeholder="Total Marks"
                 value={totalMarks}
@@ -410,6 +427,7 @@ export default function ExamsPage() {
                   setClassName("");
                   setExamType("");
                   setExamDate("");
+                  setExamTime("");
                   setTotalMarks("");
                   setPassingMarks("");
                 }}
@@ -445,6 +463,7 @@ export default function ExamsPage() {
                         className,
                         examType,
                         examDate,
+                        examTime,
                         totalMarks,
                         passingMarks,
                       }),
@@ -460,6 +479,7 @@ export default function ExamsPage() {
                         className,
                         examType,
                         examDate,
+                        examTime,
                         totalMarks,
                         passingMarks,
                       }),
@@ -477,6 +497,7 @@ export default function ExamsPage() {
                     setClassName("");
                     setExamType("");
                     setExamDate("");
+                    setExamTime("");
                     setTotalMarks("");
                     setPassingMarks("");
                     setEditingId(null);

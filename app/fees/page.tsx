@@ -22,7 +22,7 @@ export default function FeesPage() {
   const [paidAmount, setPaidAmount] = useState<number | "">("");
   const [pendingFees, setPendingFees] = useState(0);
   const [paymentDate, setPaymentDate] = useState("");
-  const [status, setStatus] = useState("");
+  
 
   const [fees, setFees] = useState<Fee[]>([]);
   const [search, setSearch] = useState("");
@@ -111,7 +111,7 @@ export default function FeesPage() {
             setPaidAmount(0);
             setPendingFees(0);
             setPaymentDate("");
-            setStatus("");
+            
             setShowModal(true);
           }}
           className="bg-blue-600 hover:bg-blue-700 transition text-white px-6 py-3 rounded-lg whitespace-nowrap shadow mb-6"
@@ -218,7 +218,7 @@ export default function FeesPage() {
                         setPaidAmount(fee.paidAmount);
                         setPendingFees(fee.pendingFees);
                         setPaymentDate(fee.paymentDate);
-                        setStatus(fee.status);
+                        
                         setShowModal(true);
                       }}
                       className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded mr-2"
@@ -283,6 +283,7 @@ export default function FeesPage() {
 
               <input
                 type="number"
+                min={0}
                 placeholder="Enter Total Fees"
                 value={totalFees}
                 onChange={(e) => {
@@ -304,17 +305,23 @@ export default function FeesPage() {
 
               <input
                 type="number"
+                min={0}
                 placeholder="Enter Paid Amount"
                 value={paidAmount}
                 onChange={(e) => {
-                  const paid =
-                    e.target.value === "" ? "" : Number(e.target.value);
+  const paid =
+    e.target.value === "" ? "" : Number(e.target.value);
 
-                  setPaidAmount(paid);
+  const total = totalFees === "" ? 0 : totalFees;
 
-                  const total = totalFees === "" ? 0 : totalFees;
-                  setPendingFees(total - (paid === "" ? 0 : paid));
-                }}
+  if (paid !== "" && paid > total) {
+    alert("Paid Amount cannot be greater than Total Fees");
+    return;
+  }
+
+  setPaidAmount(paid);
+  setPendingFees(total - (paid === "" ? 0 : paid));
+}}
                 className="w-full border border-gray-300 rounded-lg p-3 text-black"
               />
 
@@ -354,7 +361,7 @@ export default function FeesPage() {
                   setPaidAmount("");
                   setPendingFees(0);
                   setPaymentDate("");
-                  setStatus("");
+                  
                 }}
                 className="bg-gray-500 hover:bg-gray-600 text-white px-5 py-2 rounded-lg"
               >
@@ -374,9 +381,7 @@ export default function FeesPage() {
                     return;
                   }
 
-                  const finalPending =
-                    (totalFees === "" ? 0 : totalFees) -
-                    (paidAmount === "" ? 0 : paidAmount);
+                  const finalPending = totalFees - paidAmount;
 
                   const finalStatus =
                     finalPending === 0 ? "Paid" : "Pending";
@@ -430,7 +435,7 @@ export default function FeesPage() {
                     setPaidAmount("");
                     setPendingFees(0);
                     setPaymentDate("");
-                    setStatus("");
+                    
                     setEditingId(null);
 
                     await loadFees();

@@ -48,6 +48,7 @@ export async function PUT(
         className: body.className,
         examType: body.examType,
         examDate: body.examDate,
+        examTime: body.examTime,
         totalMarks: body.totalMarks,
         passingMarks: body.passingMarks,
       },

@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
@@ -39,15 +40,19 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
 
+    const hashedPassword = await bcrypt.hash(body.password, 10);
+
     const student = await prisma.student.update({
       where: {
         id: Number(id),
       },
       data: {
-        name: body.name,
-        email: body.email,
-        class: body.class,
-      },
+  rollNo: body.rollNo,
+  name: body.name,
+  email: body.email,
+  class: body.class,
+  password: hashedPassword,
+},
     });
 
     return NextResponse.json(student);

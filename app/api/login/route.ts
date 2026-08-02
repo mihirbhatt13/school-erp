@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-
-const prisma = new PrismaClient();
 
 const JWT_SECRET =
   process.env.JWT_SECRET || "school_erp_super_secret_2026";
@@ -32,10 +30,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const isPasswordValid = await bcrypt.compare(
-      password,
-      admin.password
-    );
+    let isPasswordValid = false;
+    if (admin.password) {
+      if (
+        admin.password.startsWith("$2a$") ||
+        admin.password.startsWith("$2b$") ||
+        admin.password.startsWith("$2y$")
+      ) {
+        isPasswordValid = await bcrypt.compare(password, admin.password);
+      } else {
+        isPasswordValid = password === admin.password;
+        if (isPasswordValid) {
+          const hashedPassword = await bcrypt.hash(password, 10);
+          await prisma.admin.update({
+            where: { id: admin.id },
+            data: { password: hashedPassword },
+          });
+        }
+      }
+    }
 
     if (!isPasswordValid) {
       return NextResponse.json(
@@ -48,6 +61,7 @@ export async function POST(req: NextRequest) {
       {
         id: admin.id,
         email: admin.email,
+        role: "admin",
       },
       JWT_SECRET,
       {
@@ -68,7 +82,6 @@ export async function POST(req: NextRequest) {
     });
 
     return response;
-
   } catch (error) {
     console.error(error);
 

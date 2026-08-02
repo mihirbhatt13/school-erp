@@ -44,10 +44,14 @@ export async function PUT(
         id: Number(id),
       },
       data: {
-        name: body.name,
-        email: body.email,
-        subject: body.subject,
-      },
+  teacherId: body.teacherId,
+  name: body.name,
+  email: body.email,
+  phone: body.phone,
+  subject: body.subject,
+  assignedClass: body.assignedClass,
+  password: body.password,
+},
     });
 
     return NextResponse.json(teacher);
