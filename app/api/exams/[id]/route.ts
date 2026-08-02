@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -18,15 +21,10 @@ export async function DELETE(
       message: "Exam Deleted Successfully",
     });
   } catch (error) {
-    console.error(error);
-
+    console.error("Error deleting exam from database:", error);
     return NextResponse.json(
-      {
-        error: "Exam not found",
-      },
-      {
-        status: 404,
-      }
+      { error: "Exam schedule not found or could not be deleted" },
+      { status: 500 }
     );
   }
 }
@@ -49,22 +47,17 @@ export async function PUT(
         examType: body.examType,
         examDate: body.examDate,
         examTime: body.examTime,
-        totalMarks: body.totalMarks,
-        passingMarks: body.passingMarks,
+        totalMarks: Number(body.totalMarks),
+        passingMarks: Number(body.passingMarks),
       },
     });
 
     return NextResponse.json(exam);
   } catch (error) {
-    console.error(error);
-
+    console.error("Error updating exam in database:", error);
     return NextResponse.json(
-      {
-        error: "Unable to update exam",
-      },
-      {
-        status: 500,
-      }
+      { error: "Unable to update exam in database" },
+      { status: 500 }
     );
   }
 }

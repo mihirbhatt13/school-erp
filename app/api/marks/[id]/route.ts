@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 // DELETE MARK
 export async function DELETE(
   request: Request,
@@ -19,15 +22,10 @@ export async function DELETE(
       message: "Marks Deleted Successfully",
     });
   } catch (error) {
-    console.error(error);
-
+    console.error("Error deleting mark from database:", error);
     return NextResponse.json(
-      {
-        error: "Mark not found",
-      },
-      {
-        status: 404,
-      }
+      { error: "Marks entry not found or could not be deleted" },
+      { status: 500 }
     );
   }
 }
@@ -41,32 +39,12 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
 
-    const existingMark = await prisma.mark.findFirst({
-  where: {
-    studentId: Number(body.studentId),
-    subject: body.subject,
-    examType: body.examType,
-    NOT: {
-      id: Number(id),
-    },
-  },
-});
-
-if (existingMark) {
-  return NextResponse.json(
-    {
-      error: "Marks already exist for this student, subject and exam.",
-    },
-    { status: 400 }
-  );
-}
-
     const mark = await prisma.mark.update({
       where: {
         id: Number(id),
       },
       data: {
-        studentId: Number(body.studentId),
+        studentId: Number(body.studentId) || 1,
         student: body.student,
         className: body.className,
         subject: body.subject,
@@ -79,15 +57,10 @@ if (existingMark) {
 
     return NextResponse.json(mark);
   } catch (error) {
-    console.error(error);
-
+    console.error("Error updating mark in database:", error);
     return NextResponse.json(
-      {
-        error: "Unable to update marks",
-      },
-      {
-        status: 500,
-      }
+      { error: "Unable to update marks entry in database" },
+      { status: 500 }
     );
   }
 }

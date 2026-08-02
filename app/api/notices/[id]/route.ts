@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -18,15 +21,10 @@ export async function DELETE(
       message: "Notice Deleted Successfully",
     });
   } catch (error) {
-    console.error(error);
-
+    console.error("Error deleting notice from database:", error);
     return NextResponse.json(
-      {
-        error: "Notice not found",
-      },
-      {
-        status: 404,
-      }
+      { error: "Notice record not found or could not be deleted" },
+      { status: 500 }
     );
   }
 }
@@ -52,15 +50,10 @@ export async function PUT(
 
     return NextResponse.json(notice);
   } catch (error) {
-    console.error(error);
-
+    console.error("Error updating notice in database:", error);
     return NextResponse.json(
-      {
-        error: "Unable to update notice",
-      },
-      {
-        status: 500,
-      }
+      { error: "Unable to update notice in database" },
+      { status: 500 }
     );
   }
 }

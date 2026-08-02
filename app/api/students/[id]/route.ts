@@ -2,6 +2,9 @@ import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -10,20 +13,19 @@ export async function DELETE(
     const { id } = await params;
     const studentId = Number(id);
 
-    try {
-      await prisma.student.delete({
-        where: { id: studentId },
-      });
-    } catch (dbErr) {
-      console.warn("DB student delete warning:", dbErr);
-    }
+    await prisma.student.delete({
+      where: { id: studentId },
+    });
 
     return NextResponse.json({
       message: "Student Deleted Successfully",
     });
   } catch (error) {
-    console.error(error);
-    return NextResponse.json({ message: "Student Deleted Successfully" });
+    console.error("Error deleting student from database:", error);
+    return NextResponse.json(
+      { message: "Failed to delete student from database" },
+      { status: 500 }
+    );
   }
 }
 
@@ -49,21 +51,16 @@ export async function PUT(
       updateData.password = await bcrypt.hash(body.password, 10);
     }
 
-    try {
-      const student = await prisma.student.update({
-        where: { id: studentId },
-        data: updateData,
-      });
+    const student = await prisma.student.update({
+      where: { id: studentId },
+      data: updateData,
+    });
 
-      return NextResponse.json(student);
-    } catch (dbError) {
-      console.warn("DB student update fallback:", dbError);
-      return NextResponse.json({ id: studentId, ...updateData });
-    }
+    return NextResponse.json(student);
   } catch (error) {
-    console.error("Error updating student:", error);
+    console.error("Error updating student in database:", error);
     return NextResponse.json(
-      { error: "Unable to update student" },
+      { message: "Unable to update student in database" },
       { status: 500 }
     );
   }

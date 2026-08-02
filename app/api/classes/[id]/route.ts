@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -9,20 +12,19 @@ export async function DELETE(
     const { id } = await params;
     const classId = Number(id);
 
-    try {
-      await prisma.class.delete({
-        where: { id: classId },
-      });
-    } catch (dbErr) {
-      console.warn("DB class delete warning:", dbErr);
-    }
+    await prisma.class.delete({
+      where: { id: classId },
+    });
 
     return NextResponse.json({
       message: "Class Deleted Successfully",
     });
   } catch (error) {
-    console.error(error);
-    return NextResponse.json({ message: "Class Deleted Successfully" });
+    console.error("Error deleting class from database:", error);
+    return NextResponse.json(
+      { message: "Failed to delete class from database" },
+      { status: 500 }
+    );
   }
 }
 
@@ -35,26 +37,19 @@ export async function PUT(
     const classId = Number(id);
     const body = await request.json();
 
-    const updateData = {
-      className: body.className,
-      section: body.section,
-    };
+    const updatedClass = await prisma.class.update({
+      where: { id: classId },
+      data: {
+        className: body.className,
+        section: body.section,
+      },
+    });
 
-    try {
-      const updatedClass = await prisma.class.update({
-        where: { id: classId },
-        data: updateData,
-      });
-
-      return NextResponse.json(updatedClass);
-    } catch (dbError) {
-      console.warn("DB class update fallback:", dbError);
-      return NextResponse.json({ id: classId, ...updateData, ...body });
-    }
+    return NextResponse.json(updatedClass);
   } catch (error) {
-    console.error("Error updating class:", error);
+    console.error("Error updating class in database:", error);
     return NextResponse.json(
-      { error: "Unable to update class" },
+      { message: "Unable to update class in database" },
       { status: 500 }
     );
   }
