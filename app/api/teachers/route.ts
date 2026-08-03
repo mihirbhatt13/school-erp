@@ -12,9 +12,10 @@ export async function GET() {
     });
     return NextResponse.json(teachers);
   } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
     console.error("Prisma teacher fetch error:", error);
     return NextResponse.json(
-      { message: "Failed to fetch teachers from database" },
+      { message: `Database Read Error: ${errMsg}` },
       { status: 500 }
     );
   }
@@ -41,16 +42,17 @@ export async function POST(request: Request) {
         email: body.email,
         phone: body.phone || null,
         subject: body.subject || "Mathematics",
-        assignedClass: body.assignedClass || "Grade 10-A",
+        assignedClass: body.assignedClass || "Class 10-A",
         password: hashedPassword,
       },
     });
 
     return NextResponse.json(teacher, { status: 201 });
   } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
     console.error("Error creating teacher in database:", error);
     return NextResponse.json(
-      { message: "Failed to create teacher in database" },
+      { message: `Database Create Error: ${errMsg}` },
       { status: 500 }
     );
   }

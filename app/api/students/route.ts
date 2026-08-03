@@ -12,9 +12,10 @@ export async function GET() {
     });
     return NextResponse.json(students);
   } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
     console.error("Prisma student fetch error:", error);
     return NextResponse.json(
-      { message: "Failed to fetch students from database" },
+      { message: `Database Read Error: ${errMsg}` },
       { status: 500 }
     );
   }
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
         rollNo: body.rollNo || `STU${Math.floor(1000 + Math.random() * 9000)}`,
         name: body.name,
         email: body.email,
-        class: body.class || "Grade 10-A",
+        class: body.class || "Class 10-A",
         phone: body.phone || null,
         address: body.address || null,
         password: hashedPassword,
@@ -48,9 +49,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json(student, { status: 201 });
   } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
     console.error("Error creating student in database:", error);
     return NextResponse.json(
-      { message: "Failed to create student in database. Check DB connection." },
+      { message: `Database Create Error: ${errMsg}` },
       { status: 500 }
     );
   }

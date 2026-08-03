@@ -21,9 +21,10 @@ export async function DELETE(
       message: "Student Deleted Successfully",
     });
   } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
     console.error("Error deleting student from database:", error);
     return NextResponse.json(
-      { message: "Failed to delete student from database" },
+      { message: `Database Delete Error: ${errMsg}` },
       { status: 500 }
     );
   }
@@ -58,9 +59,10 @@ export async function PUT(
 
     return NextResponse.json(student);
   } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
     console.error("Error updating student in database:", error);
     return NextResponse.json(
-      { message: "Unable to update student in database" },
+      { message: `Database Update Error: ${errMsg}` },
       { status: 500 }
     );
   }
