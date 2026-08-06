@@ -1,199 +1,112 @@
-# 🏫 EduPulse Academy - School ERP & Learning Management System
+# Production PDF Retrieval-Augmented Generation (RAG) System
 
-> **EduPulse Academy** is a modern, full-stack School Enterprise Resource Planning (ERP) platform built with **Next.js 16 (App Router & Turbopack)**, **TypeScript**, **TailwindCSS**, **Prisma ORM**, and **PostgreSQL**.
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Qdrant](https://img.shields.io/badge/VectorDB-Qdrant-red.svg)](https://qdrant.tech/)
+[![SentenceTransformers](https://img.shields.io/badge/Embeddings-SentenceTransformers-green.svg)](https://sbert.net/)
+[![OpenRouter](https://img.shields.io/badge/LLM-OpenRouter-purple.svg)](https://openrouter.ai/)
 
----
-
-## 🌟 Key Features
-
-### 🏢 Public Institutional Portal
-- **Interactive Hero Slider**: Dynamic banner showcasing campus life, science labs, libraries, and athletic facilities.
-- **About School & Mission**: Detailed institutional background, core values, and infrastructure highlights.
-- **Admissions Inquiry Form**: Direct communication form for parents and prospective students with backend inquiry storage.
-- **Enhanced Footer**: 5-column responsive footer with quick navigation links, contact details, official social profiles (LinkedIn, GitHub, Instagram), and back-to-top smooth scrolling.
-- **Legal Compliance Pages**: Full [Privacy Policy](app/privacy-policy/page.tsx) and [Terms of Service](app/terms-of-service/page.tsx) pages.
-
-### 👨‍💼 Administrator Workspace (`/admin`)
-- **Student Roster Management**: Create, edit, search, and delete student accounts with roll numbers, classes, and credentials.
-- **Faculty Directory**: Add, update, and manage teacher profiles, subject specializations, and assigned classes.
-- **Class & Timetable Control**: Class creation and section management.
-- **Fee Register & Ledger**: Track total fees, paid amounts, pending balances, and fee status per student.
-- **Exam Management**: Schedule exams, update passing criteria, and enter student marks.
-- **Notice Board Broadcasts**: Post official announcements for students, parents, and faculty.
-- **Inquiries Desk**: Inspect parent and visitor inquiries submitted from the contact form.
-
-### 👨‍🏫 Faculty Workspace (`/teacher-dashboard`)
-- **Daily Attendance Register**: Interactive attendance entry system (**Present**, **Absent**, **Late**) for assigned classes with date picker.
-- **Student Roster**: View student details (Avatar Photo, Roll No, Class, Email, Phone, Address).
-- **Profile & Photo Management**: Edit teacher details (**Name**, **Phone**, **Subject**, **Class**, **Address**) and upload custom profile photos with instant live preview.
-- **Exam Schedule & Notices**: Access upcoming test dates and school broadcasts.
-
-### 👨‍🎓 Student & Parent Workspace (`/student-dashboard`)
-- **Personal Profile Management**: Update personal contact information, address, and upload avatar photo.
-- **Attendance History**: Track daily attendance percentage and presence log.
-- **Fee Ledger**: View fee payments, receipts, and outstanding dues.
-- **Exam Timetable & Results**: Access exam dates and subject marks.
-- **School Notices**: View school announcements.
+A production-grade Retrieval-Augmented Generation (RAG) application built with Python 3.11+. Parses PDF documents, generates local vector embeddings using **Sentence Transformers**, indexes them into **Qdrant**, and performs strict, hallucination-free question answering via **OpenRouter free LLMs** with mandatory page and document citations.
 
 ---
 
-## 🛠️ Technology Stack
+## 🏗️ Architecture & Features
 
-| Layer | Technology |
-| :--- | :--- |
-| **Frontend Framework** | [Next.js 16](https://nextjs.org/) (App Router, Turbopack) |
-| **Language** | [TypeScript](https://www.typescriptlang.org/) |
-| **Styling** | [TailwindCSS v4](https://tailwindcss.com/) & Vanilla CSS |
-| **Database ORM** | [Prisma ORM](https://www.prisma.io/) |
-| **Database Engine** | [PostgreSQL](https://www.postgresql.org/) |
-| **Authentication** | JWT (JSON Web Tokens) & HTTP-Only Secure Cookies |
-| **Password Hashing** | Bcryptjs |
+- **Document Parsing**: Extracts text page-by-page from PDFs in `data/` while preserving document name and page number metadata.
+- **Local Embeddings**: Embeds chunks using `sentence-transformers/all-MiniLM-L6-v2` (384-dim) locally without external API costs.
+- **Qdrant Vector Database**: Supports zero-setup Local Disk mode (`./qdrant_db`), local Docker container, or Qdrant Cloud.
+- **OpenRouter Free LLM Generation**: Integrates with OpenRouter using models like `meta-llama/llama-3.3-70b-instruct:free` or `google/gemini-2.0-flash-lite-preview-02-05:free`.
+- **Strict Anti-Hallucination & Citations**: Returns exact document citations (Document Name, Page Number, Text Snippet) for every answer. Fallback message: *"The information is not available in the supplied documents."* if missing.
 
 ---
 
-## 📁 Project Directory Structure
+## 📁 Project Structure
 
 ```
-school-erp/
-├── app/                        # Next.js App Router Routes & Pages
-│   ├── about/                  # About School Page
-│   ├── admin/                  # Admin Dashboard & Inquiry Management
-│   ├── api/                    # RESTful Backend API Endpoints
-│   │   ├── attendance/         # Attendance CRUD Endpoints
-│   │   ├── contact/            # Inquiry Form Endpoints
-│   │   ├── exams/              # Exam Timetable Endpoints
-│   │   ├── fees/               # Fee Ledger Endpoints
-│   │   ├── student-profile/    # Student Profile & Photo Endpoints
-│   │   ├── teacher-profile/    # Teacher Profile & Photo Endpoints
-│   │   └── upload/             # Local File Upload Service (/public/uploads)
-│   ├── components/             # Reusable Components (Admin Layout, Enhanced Footer)
-│   ├── contact/                # Contact Us Page
-│   ├── login/                  # Admin Login Page
-│   ├── privacy-policy/         # Legal Privacy Policy Page
-│   ├── student/                # Admin Student Management Page
-│   ├── student-dashboard/      # Student Workspace & Profile Editor
-│   ├── student-login/          # Student Login Page (Password & OTP)
-│   ├── teacher/                # Admin Teacher Management Page
-│   ├── teacher-attendance/     # Teacher Daily Attendance Register
-│   ├── teacher-dashboard/      # Faculty Workspace Dashboard
-│   ├── teacher-login/          # Teacher Login Page (Password & OTP)
-│   ├── teacher-profile/        # Teacher Profile Editor & Photo Upload
-│   ├── teacher-students/       # Assigned Student Roster
-│   └── terms-of-service/       # Legal Terms of Service Page
-├── lib/                        # Global Libraries (Prisma Singleton)
-├── prisma/                     # Database Schema & Migrations
-│   └── schema.prisma           # Prisma PostgreSQL Models
-├── public/                     # Static Assets & Uploaded Profile Photos
-│   ├── images/                 # Campus Photography & Logo
-│   └── uploads/                # Dynamic Profile Avatars
-├── .env.example                # Example Environment Variables Template
-├── DOCUMENTATION.md            # Detailed Architecture & API Reference
-├── next.config.ts              # Next.js Image & App Configuration
-├── package.json                # Dependencies & NPM Scripts
-└── README.md                   # Complete Documentation
+├── app.py                 # Main application (CLI interactive chat, single query & Streamlit UI)
+├── ingest.py              # PDF parser, chunker & Qdrant vector indexer script
+├── requirements.txt       # Production dependencies
+├── .env.example           # Environment variables configuration template
+├── README.md              # Project documentation
+├── data/                  # Input directory for PDF documents
+│   └── school_handbook.pdf# Sample PDF document
+└── utils/                 # Modular package
+    ├── __init__.py        # Package exports
+    ├── pdf_loader.py      # PyPDF text extraction & metadata tagger
+    ├── text_splitter.py   # Recursive chunking & metadata propagator
+    ├── vector_store.py    # Embedding generator & Qdrant client manager
+    ├── llm_client.py      # OpenRouter API client with anti-hallucination prompt
+    └── rag_chain.py       # Pipeline orchestrator & citation formatter
 ```
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Quickstart & Setup
 
-### 1. Prerequisites
-Ensure you have the following installed on your machine:
-- **Node.js**: v18.0.0 or higher
-- **NPM**: v9.0.0 or higher
-- **PostgreSQL**: Running locally or via a cloud instance (Supabase, Railway, Neon)
+### 1. Prerequisites & Environment Setup
+Ensure Python 3.11+ is installed. Clone the repository and set up a virtual environment:
 
----
+```bash
+python -m venv venv
+# On Windows:
+venv\Scripts\activate
+# On Linux/macOS:
+source venv/bin/activate
 
-### 2. Installation Steps
+pip install -r requirements.txt
+```
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/mihirbhatt13/school-erp.git
-   cd school-erp
-   ```
+### 2. Configure Environment Variables
+Copy `.env.example` to `.env` and set your OpenRouter API Key (get a free key at [openrouter.ai/keys](https://openrouter.ai/keys)):
 
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
+```bash
+cp .env.example .env
+```
 
-3. **Configure Environment Variables**:
-   Copy `.env.example` to `.env`:
-   ```bash
-   cp .env.example .env
-   ```
-   Update `.env` with your PostgreSQL database credentials:
-   ```env
-   DATABASE_URL="postgresql://postgres:password@localhost:5432/school_erp"
-   JWT_SECRET="edupulse_school_erp_super_secret_jwt_key_2026"
-   ```
-
-4. **Initialize PostgreSQL Database**:
-   Push the Prisma schema to your PostgreSQL database:
-   ```bash
-   npx prisma db push
-   ```
-
-5. **Start Development Server**:
-   ```bash
-   npm run dev
-   ```
-   Open **[http://localhost:3000](http://localhost:3000)** in your browser.
-
----
-
-## 🗄️ Database Schema Overview
-
-```prisma
-model Student {
-  id           Int     @id @default(autoincrement())
-  rollNo       String? @unique
-  name         String
-  email        String  @unique
-  class        String
-  password     String?
-  phone        String?
-  address      String?
-  profileImage String?
-}
-
-model Teacher {
-  id            Int      @id @default(autoincrement())
-  teacherId     String   @unique
-  name          String
-  email         String   @unique
-  phone         String?
-  subject       String
-  assignedClass String
-  password      String?
-  address       String?
-  profileImage  String?
-}
-
-model Attendance {
-  id        Int    @id @default(autoincrement())
-  studentId Int
-  student   String
-  className String
-  date      String
-  status    String
-}
+*Inside `.env`:*
+```ini
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+OPENROUTER_MODEL=meta-llama/llama-3.3-70b-instruct:free
+QDRANT_MODE=local
 ```
 
 ---
 
-## 👤 Developer & Contact Information
+## ⚡ Usage
 
-- **Owner / Lead Developer**: Mihir Bhatt
-- **Helpline Phone**: [+91 90797 81144](tel:+919079781144)
-- **Address**: 402, Siddhivinayak Apartment, near Chamunda Heritage, Sahar Road, Andheri East, Mumbai - 400057
-- **LinkedIn**: [Mihir Bhatt Profile](https://www.linkedin.com/in/mihir-bhatt-02543b353)
-- **GitHub**: [@mihirbhatt13](https://github.com/mihirbhatt13)
-- **Instagram**: [@official_mihir13](https://www.instagram.com/official_mihir13)
+### Step 1: Ingest PDF Documents
+Place your PDF files inside the `data/` folder and execute the ingestion script:
+
+```bash
+python ingest.py
+```
+*This parses all PDFs, generates local embeddings, and populates the Qdrant vector collection.*
+
+### Step 2: Query the RAG Application
+
+#### Interactive CLI Mode
+```bash
+python app.py
+```
+
+#### Single Query CLI Execution
+```bash
+python app.py "What is the tuition refund policy?"
+```
+
+#### Streamlit Web UI Mode
+```bash
+streamlit run app.py
+```
 
 ---
 
-## 📄 License & Copyright
+## 🧪 Verification & Expected Output
 
-© 2026 **Mihir Bhatt**. All rights reserved.
+- **Query with information present in PDF:**
+  Returns a precise answer accompanied by an explicit citation table listing:
+  1. `Document Name` (e.g. `school_handbook.pdf`)
+  2. `Page Number` (e.g. `Page 2`)
+  3. `Retrieved Text Snippet`
+
+- **Query with information NOT present in PDF:**
+  Output: `The information is not available in the supplied documents.`
